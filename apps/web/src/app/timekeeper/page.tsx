@@ -113,6 +113,12 @@ export default function TimekeeperPage() {
               {VIEW_LABELS[v]}
             </button>
           ))}
+          <a
+            href="/timekeeper/daily"
+            className="px-3 py-1 rounded-full text-xs bg-blue-600 text-white hover:bg-blue-700 transition-colors ml-auto"
+          >
+            ⚽ 今日の詳細
+          </a>
         </div>
       </header>
 
