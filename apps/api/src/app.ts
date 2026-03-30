@@ -13,6 +13,7 @@ import reviews from "./routes/reviews";
 import analytics from "./routes/analytics";
 import admin from "./routes/admin";
 import plans from "./routes/plans";
+import setup from "./routes/setup";
 import { adminMiddleware } from "./middleware/auth";
 
 const app = new Hono<Env>();
@@ -45,6 +46,9 @@ app.route("/analytics", analytics);
 
 app.use("/plans/*", authMiddleware);
 app.route("/plans", plans);
+
+app.use("/setup/*", authMiddleware);
+app.route("/setup", setup);
 
 // Admin routes (認証 + 管理者権限)
 app.use("/admin/*", authMiddleware);

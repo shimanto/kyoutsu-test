@@ -133,3 +133,74 @@ export async function apiGetHistory() {
     examHistory: unknown[];
   }>("/analytics/history");
 }
+
+// ─── Setup (テストデータ生成) ───
+export async function apiGenerateTestData(data: {
+  deviation: number;
+  targetBunrui?: string;
+  targetTotal?: number;
+  examYear?: number;
+}) {
+  return apiFetch<{
+    deviation: number;
+    estimatedTotal: number;
+    subjectScores: { subjectId: string; rate: number; estimatedScore: number }[];
+    answersGenerated: number;
+    message: string;
+  }>("/setup/generate-test-data", { method: "POST", body: JSON.stringify(data) });
+}
+
+// ─── Plans ───
+export async function apiGeneratePlan(weeklyStudyHours: number = 20) {
+  return apiFetch<{
+    planId: string;
+    phase: string;
+    totalDays: number;
+    subjectAllocations: { subjectId: string; weeklyHours: number; priority: number }[];
+    taskCount: number;
+  }>("/plans/generate", { method: "POST", body: JSON.stringify({ weeklyStudyHours }) });
+}
+
+export async function apiGetCurrentPlan() {
+  return apiFetch<{ plan: unknown; tasks: unknown[] }>("/plans/current");
+}
+
+export async function apiGetTodayTasks() {
+  return apiFetch<{ tasks: unknown[] }>("/plans/current/today");
+}
+
+// ─── Content Tree ───
+export async function apiGetContentTree() {
+  return apiFetch<{
+    subjects: { id: string; name: string; max_score: number; display_order: number }[];
+    fields: { id: string; subject_id: string; name: string; display_order: number }[];
+    units: { id: string; field_id: string; name: string; display_order: number }[];
+    questionCounts: { unit_id: string; count: number }[];
+  }>("/admin/content-tree");
+}
+
+// ─── Subject Detail (分野+回答統計) ───
+export async function apiGetSubjectAnalysis(subjectId: string) {
+  return apiFetch<{
+    fieldStats: { field_id: string; field_name: string; total: number; correct: number; avg_time_ms: number }[];
+    difficultyStats: { difficulty: number; total: number; correct: number }[];
+  }>(`/analytics/subject/${subjectId}`);
+}
+
+// ─── Questions (DB問題取得) ───
+export async function apiGetQuestions(params: { fieldId?: string; subjectId?: string; limit?: number }) {
+  const q = new URLSearchParams();
+  if (params.fieldId) q.set("fieldId", params.fieldId);
+  if (params.subjectId) q.set("subjectId", params.subjectId);
+  if (params.limit) q.set("limit", String(params.limit));
+  return apiFetch<{ questions: { id: string; body: string; difficulty: number; points: number; explanation: string }[] }>(
+    `/questions?${q.toString()}`
+  );
+}
+
+export async function apiGetQuestion(id: string) {
+  return apiFetch<{
+    question: { id: string; body: string; difficulty: number; explanation: string };
+    choices: { id: string; label: string; body: string; is_correct: number; display_order: number }[];
+  }>(`/questions/${id}`);
+}

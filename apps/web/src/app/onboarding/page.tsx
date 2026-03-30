@@ -1,55 +1,59 @@
 "use client";
 
 import { useState } from "react";
-import { SUBJECTS, TODAI_RIKA_CUTOFF_ESTIMATE } from "@kyoutsu/shared";
+import { useRouter } from "next/navigation";
+import { SUBJECTS } from "@kyoutsu/shared";
+import { apiGenerateTestData, apiGeneratePlan } from "@/lib/api";
+import { getAuthUser, setAuthUser } from "@/lib/auth";
 
-// 大学プリセット
 const UNIVERSITY_PRESETS = [
   { id: "todai_rika1", name: "東京大学 理科一類", targetTotal: 780, bunrui: "rika1" },
   { id: "todai_rika2", name: "東京大学 理科二類", targetTotal: 770, bunrui: "rika2" },
   { id: "todai_rika3", name: "東京大学 理科三類", targetTotal: 830, bunrui: "rika3" },
-  { id: "custom", name: "その他の大学", targetTotal: 700, bunrui: "custom" },
+  { id: "custom", name: "その他の大学", targetTotal: 700, bunrui: "rika1" },
 ];
 
-type UniversityPreset = (typeof UNIVERSITY_PRESETS)[number];
-
-interface MockExamScore {
-  subjectId: string;
-  score: number;
-}
-
 export default function OnboardingPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [selectedUniv, setSelectedUniv] = useState(UNIVERSITY_PRESETS[0]);
-  const [examDate, setExamDate] = useState("");
-  const [examName, setExamName] = useState("");
-  const [scores, setScores] = useState<MockExamScore[]>(
-    SUBJECTS.map((s) => ({ subjectId: s.id, score: 0 }))
-  );
+  const [deviation, setDeviation] = useState(60);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    estimatedTotal: number;
+    subjectScores: { subjectId: string; rate: number; estimatedScore: number }[];
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const totalScore = scores.reduce((sum, s) => sum + s.score, 0);
-  const totalMax = SUBJECTS.reduce((sum, s) => sum + s.maxScore, 0);
+  const totalMax = SUBJECTS.reduce((s, sub) => s + sub.maxScore, 0);
 
-  const handleScoreChange = (subjectId: string, value: string) => {
-    const subject = SUBJECTS.find((s) => s.id === subjectId);
-    const num = Math.min(Number(value) || 0, subject?.maxScore || 100);
-    setScores((prev) =>
-      prev.map((s) => (s.subjectId === subjectId ? { ...s, score: num } : s))
-    );
-  };
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiGenerateTestData({
+        deviation,
+        targetBunrui: selectedUniv.bunrui,
+        targetTotal: selectedUniv.targetTotal,
+        examYear: 2027,
+      });
+      setResult(res);
 
-  const handleSubmit = () => {
-    // TODO: API連携 - 模試スコア保存 → ダッシュボードへ遷移
-    const data = {
-      university: selectedUniv,
-      examDate,
-      examName,
-      scores,
-      totalScore,
-    };
-    console.log("Onboarding data:", data);
-    // router.push("/dashboard");
-    window.location.href = "/";
+      // ユーザーキャッシュ更新
+      const user = getAuthUser();
+      if (user) {
+        setAuthUser({ ...user, targetBunrui: selectedUniv.bunrui, targetTotal: selectedUniv.targetTotal });
+      }
+
+      // 学習計画も自動生成
+      await apiGeneratePlan(20).catch(() => {});
+
+      setStep(3);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "データ生成に失敗しました");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,12 +62,7 @@ export default function OnboardingPage() {
         {/* プログレス */}
         <div className="flex gap-2 mb-8">
           {[1, 2, 3].map((s) => (
-            <div
-              key={s}
-              className={`h-1.5 flex-1 rounded-full ${
-                s <= step ? "bg-green-500" : "bg-gray-800"
-              }`}
-            />
+            <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= step ? "bg-green-500" : "bg-gray-800"}`} />
           ))}
         </div>
 
@@ -71,9 +70,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div>
             <h1 className="text-2xl font-bold mb-2">志望大学を選択</h1>
-            <p className="text-gray-400 text-sm mb-6">
-              目標点数と学習計画の基準になります
-            </p>
+            <p className="text-gray-400 text-sm mb-6">目標点数と学習計画の基準になります</p>
             <div className="space-y-3">
               {UNIVERSITY_PRESETS.map((univ) => (
                 <button
@@ -81,159 +78,110 @@ export default function OnboardingPage() {
                   onClick={() => setSelectedUniv(univ)}
                   className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
                     selectedUniv.id === univ.id
-                      ? "border-green-500 bg-green-500/10"
-                      : "border-gray-700 bg-gray-900 hover:border-gray-600"
+                      ? "border-green-500 bg-green-500/10" : "border-gray-700 bg-gray-900 hover:border-gray-600"
                   }`}
                 >
                   <div className="font-medium">{univ.name}</div>
-                  <div className="text-sm text-gray-400">
-                    目標: {univ.targetTotal} / {totalMax}
-                  </div>
+                  <div className="text-sm text-gray-400">目標: {univ.targetTotal} / {totalMax}</div>
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setStep(2)}
-              className="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
-            >
+            <button onClick={() => setStep(2)}
+              className="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors">
               次へ
             </button>
           </div>
         )}
 
-        {/* Step 2: 模試情報 */}
+        {/* Step 2: 偏差値入力 */}
         {step === 2 && (
           <div>
-            <h1 className="text-2xl font-bold mb-2">直近の模試情報</h1>
+            <h1 className="text-2xl font-bold mb-2">現在の偏差値を入力</h1>
             <p className="text-gray-400 text-sm mb-6">
-              現在の実力を把握するため、直近の模試結果を入力してください
+              直近の模試の偏差値を入力してください。あなたの実力に合ったサンプルデータを生成します。
             </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">模試名</label>
-                <input
-                  type="text"
-                  value={examName}
-                  onChange={(e) => setExamName(e.target.value)}
-                  placeholder="例: 第3回全統共通テスト模試"
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg
-                             focus:border-green-500 focus:outline-none"
-                />
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-800/30 rounded-lg text-sm text-red-400">{error}</div>
+            )}
+
+            {/* 偏差値スライダー */}
+            <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
+              <div className="text-center mb-4">
+                <span className="text-5xl font-mono font-bold text-green-400">{deviation}</span>
+                <span className="text-gray-500 text-lg ml-1">偏差値</span>
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">実施日</label>
-                <input
-                  type="date"
-                  value={examDate}
-                  onChange={(e) => setExamDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg
-                             focus:border-green-500 focus:outline-none"
-                />
+
+              <input
+                type="range" min={35} max={80} value={deviation}
+                onChange={(e) => setDeviation(Number(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-full appearance-none cursor-pointer
+                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6
+                           [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-green-500
+                           [&::-webkit-slider-thumb]:rounded-full"
+              />
+              <div className="flex justify-between text-xs text-gray-600 mt-1">
+                <span>35</span><span>50</span><span>60</span><span>70</span><span>80</span>
+              </div>
+
+              {/* 目安表示 */}
+              <div className="mt-4 text-center text-sm text-gray-400">
+                {deviation >= 75 ? "東大理三 確実圏" :
+                 deviation >= 70 ? "東大理一 安全圏" :
+                 deviation >= 65 ? "旧帝大 上位" :
+                 deviation >= 60 ? "旧帝大レベル" :
+                 deviation >= 55 ? "国公立中堅" :
+                 deviation >= 50 ? "平均" : "基礎固め段階"}
+                ・推定得点 約{Math.round((0.58 + 0.35 * (2 / (1 + Math.exp(-1.5 * (deviation - 50) / 10)) - 1)) * 900)}/900
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setStep(1)}
-                className="flex-1 py-3 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors"
-              >
-                戻る
-              </button>
-              <button
-                onClick={() => setStep(3)}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
-              >
-                次へ
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep(1)}
+                className="flex-1 py-3 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors">戻る</button>
+              <button onClick={handleGenerate} disabled={loading}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-800 rounded-lg font-medium transition-colors">
+                {loading ? "データ生成中..." : "テストデータを生成"}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: 科目別スコア入力 */}
-        {step === 3 && (
+        {/* Step 3: 結果表示 */}
+        {step === 3 && result && (
           <div>
-            <h1 className="text-2xl font-bold mb-2">科目別スコア入力</h1>
+            <h1 className="text-2xl font-bold mb-2">準備完了！</h1>
             <p className="text-gray-400 text-sm mb-6">
-              各科目の得点を入力してください
+              偏差値{deviation}のデータが生成されました。さっそく学習マップを確認しましょう。
             </p>
 
-            <div className="space-y-3">
-              {SUBJECTS.map((subject) => {
-                const score = scores.find((s) => s.subjectId === subject.id)?.score || 0;
-                const rate = score / subject.maxScore;
-                const barColor =
-                  rate >= 0.8 ? "bg-green-500" : rate >= 0.6 ? "bg-yellow-500" : "bg-red-500";
+            <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 mb-4">
+              <div className="text-center mb-4">
+                <div className="text-3xl font-mono font-bold text-white">{result.estimatedTotal}</div>
+                <div className="text-xs text-gray-500">推定合計 / {totalMax}</div>
+              </div>
 
-                return (
-                  <div key={subject.id} className="flex items-center gap-3">
-                    <div className="w-20 text-sm text-gray-300 shrink-0">
-                      {subject.shortName}
-                    </div>
-                    <div className="flex-1 relative">
-                      <div className="h-8 bg-gray-800 rounded-lg overflow-hidden">
-                        <div
-                          className={`h-full ${barColor} transition-all duration-300 rounded-lg`}
-                          style={{ width: `${rate * 100}%` }}
-                        />
+              <div className="space-y-2">
+                {result.subjectScores.map((s) => {
+                  const sub = SUBJECTS.find((x) => x.id === s.subjectId);
+                  const barColor = s.rate >= 80 ? "bg-green-500" : s.rate >= 65 ? "bg-yellow-500" : "bg-red-500";
+                  return (
+                    <div key={s.subjectId} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 w-10 shrink-0">{sub?.shortName || s.subjectId}</span>
+                      <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
+                        <div className={`h-full ${barColor} rounded-full`} style={{ width: `${s.rate}%` }} />
                       </div>
+                      <span className="text-xs font-mono w-14 text-right">{s.estimatedScore}/{sub?.maxScore || 100}</span>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <input
-                        type="number"
-                        min={0}
-                        max={subject.maxScore}
-                        value={score || ""}
-                        onChange={(e) => handleScoreChange(subject.id, e.target.value)}
-                        className="w-16 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-center
-                                   focus:border-green-500 focus:outline-none text-sm"
-                      />
-                      <span className="text-xs text-gray-500">/ {subject.maxScore}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 合計 */}
-            <div className="mt-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">合計</span>
-                <span className="text-2xl font-mono font-bold">
-                  <span
-                    className={
-                      totalScore >= selectedUniv.targetTotal
-                        ? "text-green-400"
-                        : totalScore >= TODAI_RIKA_CUTOFF_ESTIMATE
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                    }
-                  >
-                    {totalScore}
-                  </span>
-                  <span className="text-gray-500 text-lg"> / {totalMax}</span>
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                目標 {selectedUniv.targetTotal} まであと{" "}
-                <span className="text-white font-bold">
-                  {Math.max(0, selectedUniv.targetTotal - totalScore)}点
-                </span>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setStep(2)}
-                className="flex-1 py-3 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors"
-              >
-                戻る
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
-              >
-                学習を開始する
-              </button>
-            </div>
+            <button onClick={() => router.replace("/")}
+              className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors">
+              学習マップへ
+            </button>
           </div>
         )}
       </div>
