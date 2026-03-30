@@ -1,0 +1,28 @@
+{
+  "name": "@kyoutsu/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@kyoutsu/shared": "workspace:*",
+    "hono": "^4",
+    "next": "^15",
+    "react": "^19",
+    "react-dom": "^19",
+    "recharts": "^2.15",
+    "@liff/liff-types": "^2"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4",
+    "typescript": "^5.7",
+    "@cloudflare/next-on-pages": "^1"
+  }
+}

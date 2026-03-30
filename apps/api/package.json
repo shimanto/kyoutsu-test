@@ -1,0 +1,24 @@
+{
+  "name": "@kyoutsu/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "db:migrate:local": "wrangler d1 execute kyoutsu-db --local --file=src/db/schema.sql",
+    "db:seed:local": "wrangler d1 execute kyoutsu-db --local --file=src/db/seed.sql"
+  },
+  "dependencies": {
+    "@kyoutsu/shared": "workspace:*",
+    "hono": "^4",
+    "jose": "^6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4",
+    "typescript": "^5.7",
+    "vitest": "^3",
+    "wrangler": "^4"
+  }
+}
