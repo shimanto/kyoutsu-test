@@ -119,9 +119,9 @@ export default function Home() {
       <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 px-4 py-2
                        flex justify-around items-center z-50">
         <NavItem href="/" label="マップ" icon="▣" active />
+        <NavItem href="/timekeeper" label="タイムキーパー" icon="⚽" />
         <NavItem href="/study" label="学習" icon="📖" />
         <NavItem href="/analytics" label="分析" icon="📊" />
-        <NavItem href="/onboarding" label="模試入力" icon="✏️" />
       </nav>
     </div>
   );
