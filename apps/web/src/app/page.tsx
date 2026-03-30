@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { TOTAL_MAX_SCORE } from "@kyoutsu/shared";
+import { getAuthUser, logout } from "@/lib/auth";
 import { SubjectHeatmap } from "@/components/charts/SubjectHeatmap";
 import { ScoreGauge } from "@/components/charts/ScoreGauge";
 import { ReviewAlert } from "@/components/dashboard/ReviewAlert";
@@ -25,6 +26,7 @@ function daysUntil(dateStr: string): number {
 
 export default function Home() {
   const router = useRouter();
+  const authUser = getAuthUser();
   const remainingDays = daysUntil(SAMPLE_USER.examDate);
   const weakPoints = getWeakPoints(SAMPLE_FIELD_STATS, 5);
 
@@ -40,7 +42,8 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-bold">共通テスト攻略マップ</h1>
             <p className="text-xs text-gray-500 mt-0.5">
-              {SAMPLE_USER.displayName} — 偏差値60サンプル
+              {authUser?.displayName || SAMPLE_USER.displayName}
+              <button onClick={logout} className="ml-2 text-gray-600 hover:text-gray-400 underline">ログアウト</button>
             </p>
           </div>
           <div className="text-right">

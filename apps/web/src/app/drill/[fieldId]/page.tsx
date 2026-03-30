@@ -9,6 +9,7 @@ import {
   type SampleQuestion,
 } from "@/lib/sample-data";
 
+
 type Phase = "question" | "result" | "complete";
 
 export default function DrillPage() {
