@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://daigaku-monogatari.pages.dev/sitemap.xml

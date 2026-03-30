@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "./types";
 import { corsMiddleware } from "./middleware/cors";
 import { errorHandler } from "./middleware/error-handler";
+import { rateLimitMiddleware } from "./middleware/rate-limit";
 import { authMiddleware } from "./middleware/auth";
 import auth from "./routes/auth";
 import users from "./routes/users";
@@ -10,11 +11,15 @@ import questions from "./routes/questions";
 import studySessions from "./routes/study-sessions";
 import reviews from "./routes/reviews";
 import analytics from "./routes/analytics";
+import admin from "./routes/admin";
+import plans from "./routes/plans";
+import { adminMiddleware } from "./middleware/auth";
 
 const app = new Hono<Env>();
 
 // Global middleware
 app.use("*", corsMiddleware);
+app.use("*", rateLimitMiddleware);
 app.onError(errorHandler);
 
 // Health check
@@ -37,6 +42,13 @@ app.route("/questions", questions);
 app.route("/study-sessions", studySessions);
 app.route("/reviews", reviews);
 app.route("/analytics", analytics);
+
+app.use("/plans/*", authMiddleware);
+app.route("/plans", plans);
+
+// Admin routes (認証 + 管理者権限)
+app.use("/admin/*", authMiddleware);
+app.route("/admin", admin);
 
 export type AppType = typeof app;
 export default app;
