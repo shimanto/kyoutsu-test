@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 型チェック (並列実行)
+      - name: Type check API
+        run: pnpm tsc --noEmit
+        working-directory: apps/api
+
+      - name: Type check Shared
+        run: pnpm tsc --noEmit
+        working-directory: packages/shared
+
+      # ユニットテスト
+      - name: Run tests
+        run: pnpm vitest run --reporter=verbose
+        working-directory: apps/api
+
+      # フロントビルド (型チェック + static export)
+      - name: Build web
+        run: pnpm next build
+        working-directory: apps/web
+
+      # ビルド成果物を保存 (deployジョブで使用)
+      - name: Upload build artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-out
+          path: apps/web/out
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-out
+          path: out
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy out --project-name=daigaku-monogatari --branch=main
