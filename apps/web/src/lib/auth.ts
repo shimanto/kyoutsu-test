@@ -1,10 +1,11 @@
 /**
- * 認証管理 (クライアントサイド)
- * デモモード: 名前入力でログイン
- * LINE Login: LIFF_ID設定後に有効化
+ * 認証管理 — API (D1) 連携版
+ * JWT トークンを localStorage に保存
+ * ユーザー情報は API から取得してキャッシュ
  */
 
-const AUTH_KEY = "kyoutsu_auth";
+const TOKEN_KEY = "kyoutsu_token";
+const USER_CACHE_KEY = "kyoutsu_user_cache";
 
 export interface AuthUser {
   id: string;
@@ -14,13 +15,21 @@ export interface AuthUser {
   targetTotal: number;
   examYear: number;
   loginMethod: "demo" | "line";
-  createdAt: string;
+}
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function getAuthUser(): AuthUser | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(AUTH_KEY);
+    const raw = localStorage.getItem(USER_CACHE_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as AuthUser;
   } catch {
@@ -29,29 +38,15 @@ export function getAuthUser(): AuthUser | null {
 }
 
 export function setAuthUser(user: AuthUser): void {
-  localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-}
-
-export function logout(): void {
-  localStorage.removeItem(AUTH_KEY);
-  window.location.href = "/login";
-}
-
-export function demoLogin(displayName: string): AuthUser {
-  const user: AuthUser = {
-    id: `demo-${Date.now()}`,
-    displayName,
-    pictureUrl: null,
-    targetBunrui: "rika1",
-    targetTotal: 780,
-    examYear: 2027,
-    loginMethod: "demo",
-    createdAt: new Date().toISOString(),
-  };
-  setAuthUser(user);
-  return user;
+  localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
 }
 
 export function isLoggedIn(): boolean {
-  return getAuthUser() !== null;
+  return getToken() !== null;
+}
+
+export function logout(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_CACHE_KEY);
+  window.location.href = "/login";
 }

@@ -2,35 +2,51 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { demoLogin, isLoggedIn } from "@/lib/auth";
+import { isLoggedIn, setToken, setAuthUser } from "@/lib/auth";
+import { apiDemoLogin, apiGetMe } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoggedIn()) router.replace("/");
   }, [router]);
 
-  const handleDemoLogin = () => {
+  const handleDemoLogin = async () => {
     if (!name.trim()) return;
     setLoading(true);
-    demoLogin(name.trim());
-    router.replace("/onboarding");
-  };
+    setError(null);
 
-  const handleLineLogin = () => {
-    // LINE LIFF SDKが設定されたら有効化
-    // liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID })
-    //   .then(() => liff.login())
-    alert("LINE Login は設定後に有効化されます。\nまずはデモログインをお試しください。");
+    try {
+      // API でユーザー作成 + JWT取得
+      const { token, userId, displayName } = await apiDemoLogin(name.trim());
+      setToken(token);
+
+      // ユーザー情報を取得してキャッシュ
+      const { user } = await apiGetMe();
+      setAuthUser({
+        id: userId,
+        displayName: user.display_name,
+        pictureUrl: user.picture_url,
+        targetBunrui: user.target_bunrui,
+        targetTotal: user.target_total_score,
+        examYear: user.exam_year,
+        loginMethod: "demo",
+      });
+
+      router.replace("/onboarding");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ログインに失敗しました");
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-950">
       <div className="w-full max-w-sm">
-        {/* ロゴ */}
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">📚🎯</div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
@@ -42,9 +58,15 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* デモログイン */}
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 mb-4">
           <h2 className="text-sm font-bold text-gray-300 mb-3">ログイン</h2>
+
+          {error && (
+            <div className="mb-3 p-2 bg-red-900/30 border border-red-800/30 rounded-lg text-xs text-red-400">
+              {error}
+            </div>
+          )}
+
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">名前を入力してスタート</label>
@@ -57,6 +79,7 @@ export default function LoginPage() {
                 className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg
                            focus:border-green-500 focus:outline-none text-sm"
                 autoFocus
+                disabled={loading}
               />
             </div>
             <button
@@ -70,9 +93,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* LINE Login */}
         <button
-          onClick={handleLineLogin}
+          onClick={() => alert("LINE Login は設定後に有効化されます。")}
           className="w-full py-2.5 bg-[#06c755] hover:bg-[#05b64c] text-white rounded-lg
                      font-medium transition-colors flex items-center justify-center gap-2 text-sm"
         >
@@ -83,7 +105,7 @@ export default function LoginPage() {
         </button>
 
         <p className="text-[10px] text-gray-600 mt-4 text-center">
-          daigaku-monogatari.pages.dev
+          daigaku-monogatari.pages.dev — データはCloudflare D1に保存されます
         </p>
       </div>
     </div>

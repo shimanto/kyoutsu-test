@@ -2,25 +2,51 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getAuthUser, type AuthUser } from "@/lib/auth";
+import { getToken, getAuthUser, setAuthUser, type AuthUser } from "@/lib/auth";
+import { apiGetMe } from "@/lib/api";
 
 const PUBLIC_PATHS = ["/login"];
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<AuthUser | null | "loading">("loading");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const u = getAuthUser();
-    if (!u && !PUBLIC_PATHS.includes(pathname)) {
+    const token = getToken();
+
+    if (!token && !PUBLIC_PATHS.includes(pathname)) {
       router.replace("/login");
+      return;
+    }
+
+    if (token && !getAuthUser()) {
+      // トークンはあるがキャッシュがない → APIから取得
+      apiGetMe()
+        .then(({ user }) => {
+          setAuthUser({
+            id: user.id,
+            displayName: user.display_name,
+            pictureUrl: user.picture_url,
+            targetBunrui: user.target_bunrui,
+            targetTotal: user.target_total_score,
+            examYear: user.exam_year,
+            loginMethod: "demo",
+          });
+          setReady(true);
+        })
+        .catch(() => {
+          // トークン無効
+          localStorage.removeItem("kyoutsu_token");
+          localStorage.removeItem("kyoutsu_user_cache");
+          router.replace("/login");
+        });
     } else {
-      setUser(u);
+      setReady(true);
     }
   }, [pathname, router]);
 
-  if (user === "loading") {
+  if (!ready && !PUBLIC_PATHS.includes(pathname)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
         <div className="text-center">
@@ -29,10 +55,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
-  }
-
-  if (!user && !PUBLIC_PATHS.includes(pathname)) {
-    return null;
   }
 
   return <>{children}</>;

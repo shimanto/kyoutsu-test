@@ -1,17 +1,45 @@
 import { Hono } from "hono";
 import { SignJWT } from "jose";
 import { loginSchema } from "@kyoutsu/shared";
+import { z } from "zod";
 import type { Env } from "../types";
 import { generateId } from "../lib/ulid";
 
 const auth = new Hono<Env>();
+
+const demoLoginSchema = z.object({
+  displayName: z.string().min(1).max(100),
+});
+
+/** デモログイン → ユーザー作成 + JWT発行 */
+auth.post("/demo-login", async (c) => {
+  const body = await c.req.json();
+  const { displayName } = demoLoginSchema.parse(body);
+
+  const userId = generateId();
+  const currentYear = new Date().getFullYear();
+
+  await c.env.DB.prepare(
+    `INSERT INTO users (id, line_user_id, display_name, exam_year)
+     VALUES (?, ?, ?, ?)`
+  )
+    .bind(userId, `demo-${userId}`, displayName, currentYear + 1)
+    .run();
+
+  const secret = new TextEncoder().encode(c.env.JWT_SECRET);
+  const token = await new SignJWT({ sub: userId, role: "student" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("30d")
+    .sign(secret);
+
+  return c.json({ token, userId, displayName });
+});
 
 /** LINE IDトークン検証 → JWT発行 */
 auth.post("/line-login", async (c) => {
   const body = await c.req.json();
   const { idToken } = loginSchema.parse(body);
 
-  // LINE IDトークンを検証
   const verifyRes = await fetch("https://api.line.me/oauth2/v2.1/verify", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -31,7 +59,6 @@ auth.post("/line-login", async (c) => {
     picture?: string;
   };
 
-  // ユーザー upsert
   const existing = await c.env.DB.prepare(
     "SELECT id, role FROM users WHERE line_user_id = ?"
   )
@@ -61,7 +88,6 @@ auth.post("/line-login", async (c) => {
       .run();
   }
 
-  // JWT発行
   const secret = new TextEncoder().encode(c.env.JWT_SECRET);
   const token = await new SignJWT({ sub: userId, role })
     .setProtectedHeader({ alg: "HS256" })
