@@ -2,146 +2,137 @@
 
 import { useRouter } from "next/navigation";
 import { TOTAL_MAX_SCORE } from "@kyoutsu/shared";
-import { getAuthUser, logout } from "@/lib/auth";
-import { SubjectHeatmap } from "@/components/charts/SubjectHeatmap";
+import { MobileHeatmap } from "@/components/charts/MobileHeatmap";
 import { ScoreGauge } from "@/components/charts/ScoreGauge";
-import { ReviewAlert } from "@/components/dashboard/ReviewAlert";
-import { WeakPointList } from "@/components/dashboard/WeakPointList";
-import { TodayTasks } from "@/components/dashboard/TodayTasks";
-import {
-  SAMPLE_USER,
-  SAMPLE_TOTAL_SCORE,
-  SAMPLE_FIELD_STATS,
-  SAMPLE_REVIEW_DUE_COUNT,
-  SAMPLE_TODAY_TASKS,
-  getWeakPoints,
-  SUBJECT_NAMES,
-} from "@/lib/sample-data";
+import { getAuthUser, logout } from "@/lib/auth";
+import { SAMPLE_USER, SAMPLE_TOTAL_SCORE, SAMPLE_REVIEW_DUE_COUNT } from "@/lib/sample-data";
+import { HIERARCHY_DATA } from "@/lib/hierarchy-data";
 
 function daysUntil(dateStr: string): number {
-  const target = new Date(dateStr);
-  const now = new Date();
-  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
 }
 
 export default function Home() {
   const router = useRouter();
   const authUser = getAuthUser();
   const remainingDays = daysUntil(SAMPLE_USER.examDate);
-  const weakPoints = getWeakPoints(SAMPLE_FIELD_STATS, 5);
 
-  const handleFieldClick = (fieldId: string, subjectId: string) => {
-    router.push(`/drill/${fieldId}`);
-  };
+  // 弱点TOP3 を階層データから計算
+  const weakFields = HIERARCHY_DATA.flatMap((g) =>
+    g.fields.filter((f) => f.total >= 10).map((f) => ({
+      ...f, groupColor: g.color, groupLabel: g.label,
+      rate: f.correct / f.total,
+    }))
+  ).sort((a, b) => a.rate - b.rate).slice(0, 3);
 
   return (
-    <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto pb-20">
-      {/* ヘッダー */}
-      <header className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">共通テスト攻略マップ</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {authUser?.displayName || SAMPLE_USER.displayName}
-              <button onClick={logout} className="ml-2 text-gray-600 hover:text-gray-400 underline">ログアウト</button>
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-gray-500">東大理科一類</div>
-            <div className="text-red-400 text-sm font-bold">残り {remainingDays}日</div>
-          </div>
-        </div>
-
-        {/* スコアサマリー */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 text-center">
-            <div className="text-xs text-gray-500">現在スコア</div>
-            <div className="text-2xl font-mono font-bold text-white">{SAMPLE_TOTAL_SCORE}</div>
-            <div className="text-[10px] text-gray-600">/ {TOTAL_MAX_SCORE}</div>
-          </div>
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 text-center">
-            <div className="text-xs text-gray-500">目標</div>
-            <div className="text-2xl font-mono font-bold text-green-400">{SAMPLE_USER.targetTotal}</div>
-            <div className="text-[10px] text-gray-600">/ {TOTAL_MAX_SCORE}</div>
-          </div>
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 text-center">
-            <div className="text-xs text-gray-500">あと</div>
-            <div className="text-2xl font-mono font-bold text-amber-400">
-              +{SAMPLE_USER.targetTotal - SAMPLE_TOTAL_SCORE}
+    <div className="min-h-screen pb-16">
+      {/* ── ヘッダー (コンパクト) ── */}
+      <header className="sticky top-0 z-40 bg-gray-950/90 backdrop-blur-md border-b border-gray-800/50 px-3 py-2">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-bold">📚 大学物語</span>
+              <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 rounded text-gray-400">東大理一</span>
             </div>
-            <div className="text-[10px] text-gray-600">点必要</div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-red-400 font-bold">{remainingDays}日</span>
+              <button onClick={logout} className="text-gray-600 hover:text-gray-400">⏏</button>
+            </div>
+          </div>
+
+          {/* スコアバー */}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-lg font-mono font-bold">{SAMPLE_TOTAL_SCORE}</span>
+            <div className="flex-1">
+              <ScoreGauge current={SAMPLE_TOTAL_SCORE} target={SAMPLE_USER.targetTotal} max={TOTAL_MAX_SCORE} />
+            </div>
+            <span className="text-xs text-gray-500">/{TOTAL_MAX_SCORE}</span>
           </div>
         </div>
-
-        {/* プログレスバー */}
-        <ScoreGauge
-          current={SAMPLE_TOTAL_SCORE}
-          target={SAMPLE_USER.targetTotal}
-          max={TOTAL_MAX_SCORE}
-        />
       </header>
 
-      {/* ============ S&P500スタイル ヒートマップ ============ */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold">学習マップ</h2>
-          <p className="text-[10px] text-gray-600">ブロックサイズ = 配点 ｜ 色 = 正答率 ｜ クリックで強化ドリルへ</p>
+      <main className="max-w-3xl mx-auto px-3 pt-3">
+        {/* ── クイックアクション ── */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+          <QuickBtn href="/timekeeper/daily" icon="⚽" label="今日のタスク" accent="#22c55e" />
+          <QuickBtn href="/study" icon="🔄" label={`復習${SAMPLE_REVIEW_DUE_COUNT}問`} accent="#eab308" />
+          <QuickBtn href="/timekeeper" icon="🏃" label="ロードマップ" accent="#3b82f6" />
+          <QuickBtn href="/analytics" icon="📊" label="分析" accent="#8b5cf6" />
         </div>
-        <SubjectHeatmap
-          fieldStats={SAMPLE_FIELD_STATS}
-          onFieldClick={handleFieldClick}
-        />
-        {/* 凡例 */}
-        <div className="mt-3 flex items-center gap-2 justify-center text-xs text-gray-500">
-          <span>弱い</span>
-          <div className="flex gap-0.5">
-            {["#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fde68a", "#bef264", "#4ade80", "#22c55e"].map((c, i) => (
-              <div key={i} className="w-5 h-3 rounded-sm" style={{ backgroundColor: c }} />
-            ))}
+
+        {/* ── 弱点アラート ── */}
+        {weakFields.length > 0 && (
+          <div className="mb-4 p-2.5 bg-red-950/30 border border-red-900/30 rounded-xl">
+            <div className="text-[10px] text-red-400 font-bold mb-1.5">弱点 — クリックで強化</div>
+            <div className="flex gap-1.5">
+              {weakFields.map((wf) => (
+                <button
+                  key={wf.fieldId}
+                  onClick={() => router.push(`/drill/${wf.fieldId}`)}
+                  className="flex-1 p-2 rounded-lg text-center transition-all active:scale-95"
+                  style={{ backgroundColor: `${wf.groupColor}15`, border: `1px solid ${wf.groupColor}33` }}
+                >
+                  <div className="text-xs font-medium truncate">{wf.fieldName}</div>
+                  <div className="text-lg font-mono font-bold" style={{ color: rateColor(wf.rate) }}>
+                    {Math.round(wf.rate * 100)}%
+                  </div>
+                  <div className="text-[9px] text-gray-500">{wf.groupLabel}</div>
+                </button>
+              ))}
+            </div>
           </div>
-          <span>習得済み</span>
+        )}
+
+        {/* ── 学習マップ (ヒートマップ) ── */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-bold">学習マップ</h2>
+            <div className="flex gap-1">
+              {["#dc2626","#f87171","#fde68a","#4ade80","#22c55e"].map((c,i) => (
+                <div key={i} className="w-3 h-2 rounded-sm" style={{backgroundColor:c}} />
+              ))}
+            </div>
+          </div>
+          <MobileHeatmap onDrill={(fieldId) => router.push(`/drill/${fieldId}`)} />
+        </section>
+      </main>
+
+      {/* ── ボトムナビ ── */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 z-50">
+        <div className="max-w-3xl mx-auto flex justify-around py-1.5">
+          <NavItem href="/" icon="▣" label="マップ" active />
+          <NavItem href="/timekeeper" icon="🏃" label="ロード" />
+          <NavItem href="/timekeeper/daily" icon="⚽" label="今日" />
+          <NavItem href="/study" icon="📖" label="学習" />
+          <NavItem href="/analytics" icon="📊" label="分析" />
         </div>
-      </section>
-
-      {/* ============ サブパネル ============ */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <ReviewAlert count={SAMPLE_REVIEW_DUE_COUNT} />
-        <WeakPointList
-          weakPoints={weakPoints.map((wp) => ({
-            fieldName: wp.fieldName,
-            rate: wp.rate,
-            subjectName: SUBJECT_NAMES[wp.subjectId] || wp.subjectId,
-            fieldId: wp.fieldId,
-          }))}
-          onFieldClick={(fieldId) => router.push(`/drill/${fieldId}`)}
-        />
-        <TodayTasks tasks={SAMPLE_TODAY_TASKS} />
-      </div>
-
-      {/* ============ ボトムナビ ============ */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 px-4 py-2
-                       flex justify-around items-center z-50">
-        <NavItem href="/" label="マップ" icon="▣" active />
-        <NavItem href="/timekeeper" label="タイムキーパー" icon="⚽" />
-        <NavItem href="/study" label="学習" icon="📖" />
-        <NavItem href="/analytics" label="分析" icon="📊" />
       </nav>
     </div>
   );
 }
 
-function NavItem({ href, icon, label, active = false }: {
-  href: string; icon: string; label: string; active?: boolean;
-}) {
+function QuickBtn({ href, icon, label, accent }: { href: string; icon: string; label: string; accent: string }) {
   return (
-    <a
-      href={href}
-      className={`flex flex-col items-center gap-0.5 text-xs transition-colors ${
-        active ? "text-green-400" : "text-gray-500 hover:text-gray-300"
-      }`}
-    >
-      <span className="text-lg">{icon}</span>
-      <span>{label}</span>
+    <a href={href}
+       className="flex items-center gap-1.5 px-3 py-2 rounded-xl border whitespace-nowrap text-xs shrink-0 transition-colors active:scale-95"
+       style={{ borderColor: `${accent}33`, color: accent }}>
+      <span>{icon}</span><span>{label}</span>
     </a>
   );
+}
+
+function NavItem({ href, icon, label, active = false }: { href: string; icon: string; label: string; active?: boolean }) {
+  return (
+    <a href={href} className={`flex flex-col items-center gap-0.5 text-[10px] px-2 ${active ? "text-green-400" : "text-gray-500"}`}>
+      <span className="text-base">{icon}</span><span>{label}</span>
+    </a>
+  );
+}
+
+function rateColor(rate: number): string {
+  if (rate >= 0.8) return "#22c55e";
+  if (rate >= 0.65) return "#eab308";
+  if (rate >= 0.5) return "#f97316";
+  return "#ef4444";
 }

@@ -1,1 +1,0 @@
-self.__SSG_MANIFEST=new Set(["\u002Fdrill\u002F[fieldId]","\u002Fstudy\u002F[sessionId]"]);self.__SSG_MANIFEST_CB&&self.__SSG_MANIFEST_CB()
