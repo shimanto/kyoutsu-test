@@ -122,7 +122,7 @@ export async function apiRecordReview(data: { questionId: string; quality: numbe
 export async function apiGetOverview() {
   return apiFetch<{
     subjectStats: { subject_id: string; total: number; correct: number }[];
-    fieldStats: { field_id: string; field_name: string; subject_id: string; total: number; correct: number }[];
+    fieldStats: { field_id: string; field_name: string; subject_id: string; total: number; correct: number; points: number }[];
     targets: { subject_id: string; target_score: number }[];
   }>("/analytics/overview");
 }
