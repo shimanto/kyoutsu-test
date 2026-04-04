@@ -10,6 +10,7 @@ import {
 } from "@/lib/sample-data";
 import { getFieldQuestions } from "@/lib/question-generator";
 import { apiGenerateAiQuestion, apiGenerateVariantQuestion } from "@/lib/api";
+import { getRandomPraise, PRAISE_COUNT } from "@/lib/praise-messages";
 
 
 type Phase = "question" | "result" | "complete";
@@ -267,6 +268,12 @@ function DrillSession({
   const [retryRound, setRetryRound] = useState(0);
   const [questionResults, setQuestionResults] = useState<Map<string, boolean>>(new Map());
   const [retryLoading, setRetryLoading] = useState(false);
+  // 選択肢ごとの正解追跡: Map<元の問題ID, Set<正解した選択肢body>>
+  const [masteredChoices, setMasteredChoices] = useState<Map<string, Set<string>>>(new Map());
+  // 全選択肢制覇した問題数
+  const [fullyMasteredCount, setFullyMasteredCount] = useState(0);
+  // 全問正解リトライによる正答率ボーナス
+  const [rateBonus, setRateBonus] = useState(0);
 
   const question = activeQuestions[currentIndex];
   const totalQuestions = activeQuestions.length;
@@ -292,8 +299,26 @@ function DrillSession({
       correct: prev.correct + (correct ? 1 : 0),
       total: prev.total + 1,
     }));
-    // 問題ごとの正解/不正解を記録
     setQuestionResults((prev) => new Map(prev).set(question.id, correct));
+
+    // 正解した場合、その選択肢(=正解選択肢)をmastered追跡に記録
+    if (correct) {
+      const origId = question.id.replace(/_v\d+$/, "");
+      const correctBody = question.choices.find((c) => c.isCorrect)?.body || "";
+      setMasteredChoices((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(origId) || new Set<string>();
+        existing.add(correctBody);
+        next.set(origId, existing);
+        // 全4選択肢を正解したかチェック
+        const allBodies = (questions.find((q) => q.id === origId) || question);
+        if (existing.size >= allBodies.choices.length) {
+          setFullyMasteredCount((c) => c + 1);
+        }
+        return next;
+      });
+    }
+
     setPhase("result");
     requestAnimationFrame(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
@@ -313,11 +338,52 @@ function DrillSession({
   // 完了画面
   if (phase === "complete") {
     const sessionRate = results.total > 0 ? Math.round((results.correct / results.total) * 100) : 0;
+    const isPerfect = sessionRate === 100;
+
+    // 全問正解のリトライ時は +1% ボーナス
+    if (isPerfect && retryRound > 0) {
+      // rateBonus はリトライごとに加算（state更新は次のレンダリングで反映）
+    }
+
+    // 全選択肢制覇した問題があるかチェック
+    const newlyMastered = Array.from(masteredChoices.entries()).filter(
+      ([origId, bodies]) => {
+        const orig = questions.find((q) => q.id === origId);
+        return orig && bodies.size >= orig.choices.length;
+      }
+    );
+
     return (
       <div className="min-h-screen p-4 md:p-8 max-w-2xl mx-auto flex flex-col items-center justify-center gap-6">
-        <div className="text-5xl">{sessionRate >= 80 ? "🎉" : sessionRate >= 60 ? "💪" : "📚"}</div>
+        <div className="text-5xl">{isPerfect ? "🏆" : sessionRate >= 80 ? "🎉" : sessionRate >= 60 ? "💪" : "📚"}</div>
         <h1 className="text-xl font-bold">{subjectName} › {fieldName}</h1>
-        <p className="text-gray-400">ドリル完了！</p>
+        <p className="text-gray-400">{isPerfect ? "全問正解！" : "ドリル完了！"}</p>
+
+        {/* 全問正解時の褒め言葉 */}
+        {isPerfect && (
+          <div className="bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border border-yellow-700/30 rounded-xl p-5 w-full max-w-sm text-center">
+            <p className="text-yellow-400 font-bold text-base leading-relaxed">
+              {getRandomPraise()}
+            </p>
+            <p className="text-[10px] text-yellow-600 mt-2">({PRAISE_COUNT}種類の褒め言葉からランダム表示)</p>
+          </div>
+        )}
+
+        {/* 全選択肢制覇のお祝い */}
+        {newlyMastered.length > 0 && (
+          <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-700/30 rounded-xl p-4 w-full max-w-sm">
+            <p className="text-green-400 font-bold text-sm text-center mb-2">
+              全選択肢マスター達成！
+            </p>
+            <p className="text-[10px] text-green-300 text-center">
+              {newlyMastered.length}問で4つの選択肢すべてを正解として理解しました。
+              この分野の知識が完全に定着しています。
+            </p>
+            <p className="text-xs text-emerald-400 font-bold text-center mt-2">
+              {getRandomPraise()}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-4 w-full max-w-sm">
           <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 text-center">
@@ -342,19 +408,50 @@ function DrillSession({
           <div className="flex items-center justify-center gap-4">
             <div className="text-center">
               <div className="text-xs text-gray-600">Before</div>
-              <div className="text-xl font-mono font-bold" style={{ color: rateColor(currentRate) }}>
-                {currentRate}%
+              <div className="text-xl font-mono font-bold" style={{ color: rateColor(currentRate + rateBonus) }}>
+                {Math.min(currentRate + rateBonus, 100)}%
               </div>
             </div>
             <span className="text-gray-600 text-lg">→</span>
             <div className="text-center">
               <div className="text-xs text-gray-600">After (推定)</div>
-              <div className="text-xl font-mono font-bold" style={{ color: rateColor(estimateNewRate(fieldStat, results)) }}>
-                {estimateNewRate(fieldStat, results)}%
+              <div className="text-xl font-mono font-bold" style={{ color: rateColor(isPerfect ? Math.min(estimateNewRate(fieldStat, results) + rateBonus + 1, 100) : estimateNewRate(fieldStat, results) + rateBonus) }}>
+                {isPerfect ? Math.min(estimateNewRate(fieldStat, results) + rateBonus + 1, 100) : estimateNewRate(fieldStat, results) + rateBonus}%
               </div>
             </div>
           </div>
         </div>
+
+        {/* 全問正解ボーナス */}
+        {isPerfect && retryRound > 0 && (
+          <div className="text-center text-xs text-green-400 font-medium">
+            全問正解ボーナス: 正答率 +1% 加算
+          </div>
+        )}
+
+        {/* 選択肢マスター進捗 */}
+        {masteredChoices.size > 0 && (
+          <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 w-full max-w-sm">
+            <p className="text-[10px] text-gray-500 mb-2 text-center">選択肢マスター進捗</p>
+            <div className="space-y-1">
+              {questions.slice(0, 5).map((q) => {
+                const mastered = masteredChoices.get(q.id) || new Set();
+                const total = q.choices.length;
+                return (
+                  <div key={q.id} className="flex items-center gap-2">
+                    <div className="flex gap-0.5">
+                      {q.choices.map((c, i) => (
+                        <div key={i} className={`w-3 h-3 rounded-sm ${mastered.has(c.body) ? "bg-green-500" : "bg-gray-700"}`} />
+                      ))}
+                    </div>
+                    <span className="text-[10px] text-gray-500 truncate flex-1">{q.body.slice(0, 30)}...</span>
+                    {mastered.size >= total && <span className="text-[10px] text-yellow-400">完全制覇</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 不正解数カウント */}
         {(() => {
@@ -385,13 +482,43 @@ function DrillSession({
               const retryList: SampleQuestion[] = [];
               const aiPending: Promise<SampleQuestion | null>[] = [];
 
+              // 全問正解なら正答率ボーナス+1%
+              if (sessionRate === 100) {
+                setRateBonus((prev) => prev + 1);
+              }
+
               for (const q of activeQuestions) {
                 const wasCorrect = questionResults.get(q.id);
                 if (wasCorrect === false) {
                   retryList.push(q);
                 } else if (wasCorrect === true) {
-                  // 正解 → 同期変形（正しいもの⇔誤っているもの反転）を試す
-                  const syncVariant = createVariantSync(q, nextRound);
+                  // この問題で既に正解した選択肢を取得
+                  const origId = q.id.replace(/_v\d+$/, "");
+                  const mastered = masteredChoices.get(origId) || new Set<string>();
+                  const origQ = questions.find((oq) => oq.id === origId) || q;
+
+                  // 全選択肢をマスター済みなら出題不要 → 未使用問題で差し替え
+                  if (mastered.size >= origQ.choices.length) {
+                    if (unusedPool.length > 0) {
+                      const alt = unusedPool.shift()!;
+                      usedIds.add(alt.id);
+                      retryList.push(alt);
+                    }
+                    continue;
+                  }
+
+                  // 未マスターの選択肢の中から次のターゲットを選ぶ
+                  const unmasteredWrong = origQ.choices.filter(
+                    (c) => !c.isCorrect && !mastered.has(c.body)
+                  );
+                  const targetIdx = unmasteredWrong.length > 0
+                    ? origQ.choices.indexOf(unmasteredWrong[nextRound % unmasteredWrong.length])
+                    : -1;
+
+                  // 同期変形を試す（未マスター選択肢をターゲットに）
+                  const syncVariant = targetIdx >= 0
+                    ? createVariantSync(q, targetIdx)
+                    : createVariantSync(q, nextRound);
                   if (syncVariant) {
                     retryList.push(syncVariant);
                   } else if (canCreateVariant(q)) {
