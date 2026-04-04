@@ -16,6 +16,7 @@ import plans from "./routes/plans";
 import setup from "./routes/setup";
 import aiQuestions from "./routes/ai-questions";
 import feedback from "./routes/feedback";
+import growth from "./routes/growth";
 import { adminMiddleware } from "./middleware/auth";
 
 const app = new Hono<Env>();
@@ -62,6 +63,7 @@ app.route("/feedback", feedback);
 app.use("/admin/*", authMiddleware);
 app.use("/admin/*", adminMiddleware);
 app.route("/admin", admin);
+app.route("/admin/growth", growth);
 
 export type AppType = typeof app;
 export default app;

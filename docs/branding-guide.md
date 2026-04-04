@@ -354,3 +354,4 @@ LINE/Push通知で使用するテンプレート。`{変数}` は実行時に置
 11. **通知テンプレートのAPI連携** — `NOTIFICATION_COPY` をLINE Messaging APIのメッセージ生成に統合
 12. **LINE公式アカウント開設** — LINE Developersコンソールから開設
 13. **UTMパラメータ設定** — SNS経由の流入計測
+14. **成長戦略���ードマップ実行** — Phase 0〜4の段階的実行 → [growth-roadmap.md](growth-roadmap.md)
