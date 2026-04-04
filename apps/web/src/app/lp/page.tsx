@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
-import { useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { TAGLINE, CATCHCOPY, BRAND, TARGET_TAGLINE, ELEVATOR_PITCH, FAQ, getSeasonalCopy } from "@kyoutsu/shared";
+import { FaqJsonLd } from "@/components/seo/FaqJsonLd";
+import { LogoMark } from "@/components/brand/LogoMark";
+import { SnsFollowCta, SnsLinks } from "@/components/brand/SnsLinks";
 
 const FEATURES = [
   {
@@ -58,13 +62,54 @@ function rateToColor(rate: number): string {
 
 export default function LandingPage() {
   const router = useRouter();
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (isLoggedIn()) router.replace("/");
   }, [router]);
 
+  const handleScroll = useCallback(() => {
+    setScrolled(window.scrollY > 60);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
+      <FaqJsonLd />
+
+      {/* ── 固定ヘッダー ── */}
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled ? "bg-gray-950/95 backdrop-blur-md border-b border-gray-800/50 py-2" : "bg-transparent py-4"
+      }`}>
+        <div className="max-w-4xl mx-auto px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <LogoMark className="w-6 h-6" />
+            <span className={`font-bold transition-opacity ${scrolled ? "opacity-100" : "opacity-0"}`}>
+              {BRAND.NAME}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href="#features" className={`text-xs text-gray-400 hover:text-gray-200 transition-all hidden sm:inline ${
+              scrolled ? "opacity-100" : "opacity-0"
+            }`}>機能</a>
+            <a href="#faq" className={`text-xs text-gray-400 hover:text-gray-200 transition-all hidden sm:inline ${
+              scrolled ? "opacity-100" : "opacity-0"
+            }`}>FAQ</a>
+            <button
+              onClick={() => router.push("/login")}
+              className="px-4 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-xs
+                         transition-all hover:scale-105 active:scale-95"
+            >
+              無料ではじめる
+            </button>
+          </div>
+        </div>
+      </header>
+
       {/* ── Hero Section ── */}
       <section className="relative overflow-hidden">
         {/* 背景のヒートマップ装飾 */}
@@ -84,8 +129,10 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="relative z-10 max-w-4xl mx-auto px-4 py-20 md:py-32 text-center">
-          <div className="text-6xl mb-4">📚</div>
+        <div className="relative z-10 max-w-4xl mx-auto px-4 pt-28 pb-20 md:pt-36 md:pb-32 text-center">
+          <div className="mb-4 flex justify-center">
+            <LogoMark className="w-16 h-16" />
+          </div>
           <h1 className="text-4xl md:text-6xl font-black mb-3">
             <span className="bg-gradient-to-r from-green-400 via-emerald-300 to-blue-400 bg-clip-text text-transparent">
               大学物語
@@ -95,12 +142,10 @@ export default function LandingPage() {
             共通テスト攻略プラットフォーム
           </p>
           <p className="text-2xl md:text-3xl font-bold text-white mt-6 mb-8">
-            弱点が見える。だから伸びる。
+            {CATCHCOPY.HERO.headline}
           </p>
           <p className="text-sm md:text-base text-gray-400 max-w-xl mx-auto mb-10">
-            全9科目900点をS&P500スタイルのヒートマップで可視化。
-            忘却曲線に基づく最適な復習タイミングと弱点ドリルで、
-            東大・難関大合格への最短ルートを自動生成します。
+            {CATCHCOPY.HERO.sub}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -117,6 +162,15 @@ export default function LandingPage() {
                          transition-all hover:bg-gray-900"
             >
               機能を見る
+            </a>
+          </div>
+
+          {/* スクロールヒント */}
+          <div className="mt-16 animate-bounce">
+            <a href="#demo" className="text-gray-600 hover:text-gray-400 transition-colors">
+              <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
             </a>
           </div>
         </div>
@@ -139,7 +193,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── デモ ヒートマップ ── */}
-      <section className="max-w-4xl mx-auto px-4 py-16">
+      <section id="demo" className="max-w-4xl mx-auto px-4 py-16">
         <h2 className="text-center text-xl font-bold mb-2">学習マップで全科目を俯瞰</h2>
         <p className="text-center text-sm text-gray-400 mb-8">
           配点に比例したブロックサイズ。正答率で色が変化。弱点が一目瞭然。
@@ -191,10 +245,18 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── エレベーターピッチ ── */}
+      <section className="max-w-3xl mx-auto px-4 py-16 text-center">
+        <p className="text-[10px] text-green-400 font-bold tracking-widest uppercase mb-4">What is {BRAND.NAME}?</p>
+        <p className="text-base md:text-lg text-gray-300 leading-relaxed">
+          {ELEVATOR_PITCH.FULL}
+        </p>
+      </section>
+
       {/* ── Features ── */}
       <section id="features" className="max-w-4xl mx-auto px-4 py-16">
-        <h2 className="text-center text-xl font-bold mb-2">大学物語の4つの武器</h2>
-        <p className="text-center text-sm text-gray-400 mb-10">科学×可視化で、闇雲な勉強から卒業する</p>
+        <h2 className="text-center text-xl font-bold mb-2">{BRAND.NAME}の4つの武器</h2>
+        <p className="text-center text-sm text-gray-400 mb-10">{CATCHCOPY.FEATURES.headline}</p>
 
         <div className="grid md:grid-cols-2 gap-4">
           {FEATURES.map((f) => (
@@ -211,6 +273,52 @@ export default function LandingPage() {
               <p className="text-sm text-gray-400 leading-relaxed">{f.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── 比較表 ── */}
+      <section className="max-w-4xl mx-auto px-4 py-16">
+        <h2 className="text-center text-xl font-bold mb-2">なぜ大学物語なのか</h2>
+        <p className="text-center text-sm text-gray-400 mb-10">従来の勉強法との違い</p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse max-w-2xl mx-auto">
+            <thead>
+              <tr>
+                <th className="text-left py-3 px-4 text-gray-500 font-normal border-b border-gray-800" />
+                <th className="py-3 px-4 text-gray-500 font-normal border-b border-gray-800 text-center">従来の勉強法</th>
+                <th className="py-3 px-4 font-bold border-b border-green-800/50 text-center text-green-400">大学物語</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: "弱点の把握", old: "なんとなく苦手", neo: "正答率で可視化" },
+                { label: "復習タイミング", old: "気分次第", neo: "SM-2が自動計算" },
+                { label: "学習計画", old: "自分で作成", neo: "逆算で自動生成" },
+                { label: "進捗の確認", old: "ノートを見返す", neo: "ヒートマップで一目瞭然" },
+                { label: "全科目の管理", old: "科目ごとにバラバラ", neo: "900点を1画面で俯瞰" },
+                { label: "料金", old: "塾: 月額数万円", neo: "完全無料" },
+              ].map((row) => (
+                <tr key={row.label} className="border-b border-gray-800/50">
+                  <td className="py-3 px-4 font-medium text-gray-300">{row.label}</td>
+                  <td className="py-3 px-4 text-center text-gray-500">{row.old}</td>
+                  <td className="py-3 px-4 text-center text-green-400 font-medium">{row.neo}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 中間CTA */}
+        <div className="mt-12 text-center">
+          <p className="text-sm text-gray-400 mb-4">まずは無料で体験してみよう</p>
+          <button
+            onClick={() => router.push("/login")}
+            className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-bold
+                       transition-all hover:scale-105 active:scale-95 shadow-lg shadow-green-600/20"
+          >
+            無料ではじめる
+          </button>
         </div>
       </section>
 
@@ -239,7 +347,7 @@ export default function LandingPage() {
 
       {/* ── ソーシャルプルーフ ── */}
       <section className="max-w-4xl mx-auto px-4 py-16">
-        <h2 className="text-center text-xl font-bold mb-2">大学物語が選ばれる理由</h2>
+        <h2 className="text-center text-xl font-bold mb-2">{BRAND.NAME}が選ばれる理由</h2>
         <p className="text-center text-sm text-gray-400 mb-10">受験生の声と実績データ</p>
 
         {/* 数字実績 */}
@@ -293,15 +401,56 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── ターゲット別メッセージ ── */}
+      <section className="bg-gray-900/30 border-y border-gray-800/50 py-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <h2 className="text-center text-xl font-bold mb-10">あなたに合った使い方</h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[
+              { icon: "🎓", label: "受験生", ...TARGET_TAGLINE.STUDENT },
+              { icon: "👨‍👩‍👧", label: "保護者", ...TARGET_TAGLINE.PARENT },
+              { icon: "👨‍🏫", label: "教育関係者", ...TARGET_TAGLINE.EDUCATOR },
+            ].map((t) => (
+              <div key={t.label} className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+                <div className="text-2xl mb-3">{t.icon}</div>
+                <div className="text-[10px] text-green-400 font-bold mb-1">{t.label}</div>
+                <h3 className="font-bold text-sm mb-2">{t.headline}</h3>
+                <p className="text-xs text-gray-400 leading-relaxed">{t.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 季節キャンペーン ── */}
+      <SeasonalBanner />
+
+      {/* ── FAQ ── */}
+      <section id="faq" className="max-w-4xl mx-auto px-4 py-16">
+        <h2 className="text-center text-xl font-bold mb-2">よくある質問</h2>
+        <p className="text-center text-sm text-gray-400 mb-10">FAQ</p>
+        <div className="space-y-3 max-w-2xl mx-auto">
+          {FAQ.map((item, i) => (
+            <details key={i} className="bg-gray-900 rounded-xl border border-gray-800 group">
+              <summary className="px-5 py-4 cursor-pointer font-medium text-sm flex items-center justify-between hover:bg-gray-800/50 rounded-xl transition-colors">
+                <span>{item.question}</span>
+                <span className="text-gray-500 group-open:rotate-180 transition-transform text-xs ml-2">▼</span>
+              </summary>
+              <div className="px-5 pb-4 text-sm text-gray-400 leading-relaxed">
+                {item.answer}
+              </div>
+            </details>
+          ))}
+        </div>
+      </section>
+
       {/* ── CTA ── */}
       <section className="max-w-4xl mx-auto px-4 py-20 text-center">
         <h2 className="text-2xl md:text-3xl font-bold mb-3">
-          弱点が見える。だから伸びる。
+          {CATCHCOPY.CTA.headline}
         </h2>
         <p className="text-gray-400 text-sm mb-8 max-w-md mx-auto">
-          共通テスト全9科目をヒートマップで可視化し、
-          忘却曲線で最適な学習計画を自動生成。
-          合格への最短ルートを歩み始めましょう。
+          {CATCHCOPY.CTA.sub}
         </p>
         <button
           onClick={() => router.push("/login")}
@@ -312,18 +461,43 @@ export default function LandingPage() {
         </button>
       </section>
 
+      {/* ── SNS Follow ── */}
+      <section className="max-w-4xl mx-auto px-4 py-12">
+        <SnsFollowCta />
+      </section>
+
       {/* ── Footer ── */}
       <footer className="border-t border-gray-800 py-8">
         <div className="max-w-4xl mx-auto px-4 text-center text-xs text-gray-600">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-base">📚</span>
-            <span className="font-bold text-gray-400">大学物語</span>
-            <span className="text-gray-600">— 弱点が見える。だから伸びる。</span>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <LogoMark className="w-4 h-4" />
+            <span className="font-bold text-gray-400">{BRAND.NAME}</span>
+            <span className="text-gray-600">— {TAGLINE.PRIMARY}</span>
           </div>
+          <SnsLinks className="justify-center mb-3" />
           <p>Developed by Shimanto AI</p>
           <p className="mt-1">daigaku-monogatari.pages.dev</p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function SeasonalBanner() {
+  const seasonal = getSeasonalCopy(new Date().getMonth() + 1);
+  return (
+    <section className="max-w-4xl mx-auto px-4 py-12">
+      <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-800/30 rounded-2xl p-8 text-center">
+        <p className="text-[10px] text-green-400 font-bold tracking-widest uppercase mb-3">Season Campaign</p>
+        <h2 className="text-xl md:text-2xl font-bold mb-2">{seasonal.headline}</h2>
+        <p className="text-sm text-gray-400 mb-6">{seasonal.sub}</p>
+        <a
+          href="/login"
+          className="inline-block px-6 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-sm transition-all hover:scale-105 active:scale-95"
+        >
+          {seasonal.cta}
+        </a>
+      </div>
+    </section>
   );
 }

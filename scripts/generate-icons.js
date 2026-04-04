@@ -1,33 +1,64 @@
 /**
- * PWAアイコン生成スクリプト
+ * PWAアイコン & OGP画像 生成スクリプト
  *
- * icon.svg → icon-192.png, icon-512.png を生成
+ * 統一デザインの icon.svg / og-image.svg から各サイズのPNGを生成
+ *
+ * 生成物:
+ *   icon.svg    → icon-192.png, icon-512.png
+ *   og-image.svg → og-image.png (1200x630)
  *
  * 使い方:
- *   npx sharp-cli -i apps/web/public/icon.svg -o apps/web/public/icon-192.png resize 192 192
- *   npx sharp-cli -i apps/web/public/icon.svg -o apps/web/public/icon-512.png resize 512 512
+ *   node scripts/generate-icons.js
  *
- * または Canvas API (Node.js) で生成:
+ * 前提: sharp がインストール済み (pnpm add -D sharp)
+ * 代替: https://svgtopng.com/ で手動変換
  */
 
 const { execSync } = require("child_process");
 const path = require("path");
 
 const publicDir = path.join(__dirname, "..", "apps", "web", "public");
-const svgPath = path.join(publicDir, "icon.svg");
 
-const sizes = [192, 512];
+const tasks = [
+  { input: "icon.svg", output: "icon-192.png", width: 192, height: 192 },
+  { input: "icon.svg", output: "icon-512.png", width: 512, height: 512 },
+  { input: "og-image.svg", output: "og-image.png", width: 1200, height: 630 },
+];
 
-for (const size of sizes) {
-  const outPath = path.join(publicDir, `icon-${size}.png`);
-  try {
-    // sharp-cli がある場合
-    execSync(`npx sharp -i "${svgPath}" -o "${outPath}" resize ${size} ${size}`, {
-      stdio: "inherit",
-    });
-    console.log(`✓ Generated icon-${size}.png`);
-  } catch {
-    console.log(`⚠ sharp not available. Please manually convert icon.svg to icon-${size}.png`);
-    console.log(`  Online tool: https://svgtopng.com/ or use Inkscape/Figma`);
+let hasSharp = false;
+try {
+  require.resolve("sharp");
+  hasSharp = true;
+} catch {
+  // sharp not available
+}
+
+async function main() {
+  if (hasSharp) {
+    const sharp = require("sharp");
+    for (const task of tasks) {
+      const inputPath = path.join(publicDir, task.input);
+      const outputPath = path.join(publicDir, task.output);
+      try {
+        await sharp(inputPath)
+          .resize(task.width, task.height)
+          .png({ quality: 90 })
+          .toFile(outputPath);
+        console.log(`  Generated ${task.output} (${task.width}x${task.height})`);
+      } catch (err) {
+        console.error(`  Failed ${task.output}: ${err.message}`);
+      }
+    }
+  } else {
+    console.log("sharp not available. Manual conversion needed:");
+    console.log("");
+    for (const task of tasks) {
+      console.log(`  ${task.input} → ${task.output} (${task.width}x${task.height})`);
+    }
+    console.log("");
+    console.log("Install sharp: pnpm add -D sharp");
+    console.log("Or use: https://svgtopng.com/");
   }
 }
+
+main();

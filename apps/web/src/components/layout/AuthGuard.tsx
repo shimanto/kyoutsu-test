@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getToken, getAuthUser, setAuthUser, type AuthUser } from "@/lib/auth";
 import { apiGetMe } from "@/lib/api";
 
-const PUBLIC_PATHS = ["/login", "/lp"];
+const PUBLIC_PATHS = ["/login", "/lp", "/brand"];
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -50,7 +50,21 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
         <div className="text-center">
-          <div className="text-4xl mb-2 animate-pulse">📚</div>
+          <div className="flex justify-center animate-pulse mb-2">
+            <svg viewBox="0 0 48 48" className="w-10 h-10" aria-hidden="true">
+              <rect width="48" height="48" rx="10" fill="#030712"/>
+              <rect x="4" y="4" width="12" height="11" rx="2" fill="#dc2626"/>
+              <rect x="18" y="4" width="12" height="11" rx="2" fill="#f87171"/>
+              <rect x="32" y="4" width="12" height="11" rx="2" fill="#fde68a"/>
+              <rect x="4" y="17" width="12" height="11" rx="2" fill="#fca5a5"/>
+              <rect x="18" y="17" width="12" height="11" rx="2" fill="#bef264"/>
+              <rect x="32" y="17" width="12" height="11" rx="2" fill="#4ade80"/>
+              <rect x="4" y="30" width="12" height="11" rx="2" fill="#86efac"/>
+              <rect x="18" y="30" width="12" height="11" rx="2" fill="#22c55e"/>
+              <rect x="32" y="30" width="12" height="11" rx="2" fill="#15803d"/>
+              <rect x="4" y="43" width="40" height="2" rx="1" fill="#22c55e"/>
+            </svg>
+          </div>
           <p className="text-sm">読み込み中...</p>
         </div>
       </div>

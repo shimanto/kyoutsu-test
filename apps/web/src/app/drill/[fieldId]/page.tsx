@@ -8,6 +8,7 @@ import {
   SUBJECT_NAMES,
   type SampleQuestion,
 } from "@/lib/sample-data";
+import { getFieldQuestions } from "@/lib/question-generator";
 
 
 type Phase = "question" | "result" | "complete";
@@ -19,7 +20,8 @@ export default function DrillPage() {
 
   // 分野情報
   const fieldStat = SAMPLE_FIELD_STATS.find((f) => f.fieldId === fieldId);
-  const questions: SampleQuestion[] = SAMPLE_QUESTIONS_BY_FIELD[fieldId] || [];
+  const handwritten: SampleQuestion[] = SAMPLE_QUESTIONS_BY_FIELD[fieldId] || [];
+  const questions: SampleQuestion[] = getFieldQuestions(fieldId, handwritten);
   const subjectName = fieldStat ? SUBJECT_NAMES[fieldStat.subjectId] || "" : "";
   const fieldName = fieldStat?.fieldName || fieldId;
   const currentRate = fieldStat ? Math.round((fieldStat.correct / fieldStat.total) * 100) : 0;
@@ -105,6 +107,10 @@ function DrillSession({
       total: prev.total + 1,
     }));
     setPhase("result");
+    // 解説・理解度ボタンが見えるよう自動スクロール
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    });
   }, [selectedChoiceId, question]);
 
   const handleNext = () => {

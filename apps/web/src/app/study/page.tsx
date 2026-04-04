@@ -1,30 +1,53 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SUBJECTS } from "@kyoutsu/shared";
-import { apiGetDueCount } from "@/lib/api";
+import { SUBJECTS, CATCHCOPY, PAGE_META, getStageCopy } from "@kyoutsu/shared";
+import { apiGetDueCount, apiGetOverview } from "@/lib/api";
 
 const SUBJECT_GROUPS = [
-  { label: "国語", subjects: SUBJECTS.filter((s) => s.id === "kokugo") },
-  { label: "数学", subjects: SUBJECTS.filter((s) => s.id.startsWith("math")) },
-  { label: "英語", subjects: SUBJECTS.filter((s) => s.id.startsWith("eng")) },
-  { label: "理科", subjects: SUBJECTS.filter((s) => ["physics", "chemistry"].includes(s.id)) },
-  { label: "社会", subjects: SUBJECTS.filter((s) => s.id === "social") },
-  { label: "情報", subjects: SUBJECTS.filter((s) => s.id === "info1") },
+  { label: "国語", groupId: "kokugo", subjects: SUBJECTS.filter((s) => s.id === "kokugo") },
+  { label: "数学", groupId: "math", subjects: SUBJECTS.filter((s) => s.id.startsWith("math")) },
+  { label: "英語", groupId: "english", subjects: SUBJECTS.filter((s) => s.id.startsWith("eng")) },
+  { label: "理科", groupId: "science", subjects: SUBJECTS.filter((s) => ["physics", "chemistry"].includes(s.id)) },
+  { label: "社会", groupId: "social", subjects: SUBJECTS.filter((s) => s.id === "social") },
+  { label: "情報", groupId: "info", subjects: SUBJECTS.filter((s) => s.id === "info1") },
 ];
 
 export default function StudySelectPage() {
   const [reviewCount, setReviewCount] = useState<number | null>(null);
+  const [overallRate, setOverallRate] = useState<number | null>(null);
 
   useEffect(() => {
-    apiGetDueCount()
-      .then((data) => setReviewCount(data.count))
-      .catch(() => setReviewCount(0));
+    Promise.all([
+      apiGetDueCount().catch(() => ({ count: 0 })),
+      apiGetOverview().catch(() => null),
+    ]).then(([rc, ov]) => {
+      setReviewCount(rc?.count || 0);
+      if (ov?.subjectStats) {
+        const total = ov.subjectStats.reduce((s: number, x: { total: number }) => s + x.total, 0);
+        const correct = ov.subjectStats.reduce((s: number, x: { correct: number }) => s + x.correct, 0);
+        setOverallRate(total > 0 ? correct / total : 0);
+      }
+    });
   }, []);
+
+  const stage = overallRate !== null ? getStageCopy(overallRate) : null;
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-3xl mx-auto">
-      <h1 className="text-xl font-bold mb-6">学習セッション</h1>
+      <h1 className="text-xl font-bold mb-1">{PAGE_META.STUDY.title}</h1>
+      {stage ? (
+        <>
+          <p className="text-xs text-green-400 font-medium mb-1">{stage.headline}</p>
+          <p className="text-[10px] text-gray-600 mb-2">{stage.sub}</p>
+          <p className="text-[10px] text-gray-500 italic mb-6">{stage.encouragement}</p>
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-gray-500 mb-1">{CATCHCOPY.REVIEW.headline}</p>
+          <p className="text-[10px] text-gray-600 mb-6">{CATCHCOPY.REVIEW.sub}</p>
+        </>
+      )}
 
       <div className="space-y-6">
         {/* 復習セッション */}
@@ -54,9 +77,9 @@ export default function StudySelectPage() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-bold text-red-400">弱点ドリル</h2>
+              <h2 className="font-bold text-red-400">{CATCHCOPY.WEAKNESS.headline}</h2>
               <p className="text-sm text-gray-400 mt-1">
-                正答率が低い分野を集中強化
+                {CATCHCOPY.WEAKNESS.sub}
               </p>
             </div>
             <span className="text-sm text-red-400">AUTO</span>
@@ -70,7 +93,7 @@ export default function StudySelectPage() {
             {SUBJECT_GROUPS.map((group) => (
               <a
                 key={group.label}
-                href={`/study/drill?subject=${group.subjects[0]?.id}`}
+                href={`/subject/${group.groupId}`}
                 className="p-3 bg-gray-900 border border-gray-800 rounded-lg
                            hover:border-gray-600 transition-colors"
               >

@@ -1,37 +1,60 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#030712"/>
-      <stop offset="100%" style="stop-color:#0f172a"/>
+      <stop offset="0%" stop-color="#030712"/>
+      <stop offset="100%" stop-color="#0f172a"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#22c55e"/>
-      <stop offset="100%" style="stop-color:#16a34a"/>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#16a34a"/>
     </linearGradient>
+    <!-- Grid block shadow -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
+
   <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-  <!-- Heatmap blocks (signature S&P500 style) -->
-  <g transform="translate(40, 56)">
-    <!-- Row 1 -->
-    <rect x="0" y="0" width="120" height="80" rx="8" fill="#dc2626" opacity="0.9"/>
-    <rect x="128" y="0" width="80" height="80" rx="8" fill="#f87171" opacity="0.9"/>
-    <rect x="216" y="0" width="100" height="80" rx="8" fill="#fde68a" opacity="0.9"/>
-    <rect x="324" y="0" width="108" height="80" rx="8" fill="#4ade80" opacity="0.9"/>
-    <!-- Row 2 -->
-    <rect x="0" y="88" width="80" height="70" rx="8" fill="#22c55e" opacity="0.9"/>
-    <rect x="88" y="88" width="120" height="70" rx="8" fill="#fca5a5" opacity="0.9"/>
-    <rect x="216" y="88" width="70" height="70" rx="8" fill="#bef264" opacity="0.9"/>
-    <rect x="294" y="88" width="138" height="70" rx="8" fill="#22c55e" opacity="0.9"/>
-    <!-- Row 3 -->
-    <rect x="0" y="166" width="140" height="60" rx="8" fill="#4ade80" opacity="0.9"/>
-    <rect x="148" y="166" width="90" height="60" rx="8" fill="#ef4444" opacity="0.9"/>
-    <rect x="246" y="166" width="186" height="60" rx="8" fill="#fde68a" opacity="0.9"/>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- Subtle border -->
+  <rect x="2" y="2" width="508" height="508" rx="106" fill="none" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- ====== Logo Mark: 3x4 Heatmap Grid ====== -->
+  <!-- The grid tells the story: red (weak) → yellow (growing) → green (mastered) -->
+  <!-- Reading left-to-right, top-to-bottom = the learning journey -->
+  <g transform="translate(56, 48)" filter="url(#glow)">
+    <!-- Row 1: Weak areas (red spectrum) -->
+    <rect x="0"   y="0"  width="160" height="58" rx="10" fill="#dc2626" opacity="0.92"/>
+    <rect x="170" y="0"  width="90"  height="58" rx="10" fill="#ef4444" opacity="0.92"/>
+    <rect x="270" y="0"  width="130" height="58" rx="10" fill="#f87171" opacity="0.92"/>
+
+    <!-- Row 2: Growing areas (red-yellow transition) -->
+    <rect x="0"   y="68" width="110" height="58" rx="10" fill="#fca5a5" opacity="0.92"/>
+    <rect x="120" y="68" width="140" height="58" rx="10" fill="#fde68a" opacity="0.92"/>
+    <rect x="270" y="68" width="130" height="58" rx="10" fill="#fbbf24" opacity="0.92"/>
+
+    <!-- Row 3: Advancing areas (yellow-green transition) -->
+    <rect x="0"   y="136" width="130" height="58" rx="10" fill="#bef264" opacity="0.92"/>
+    <rect x="140" y="136" width="100" height="58" rx="10" fill="#86efac" opacity="0.92"/>
+    <rect x="250" y="136" width="150" height="58" rx="10" fill="#4ade80" opacity="0.92"/>
+
+    <!-- Row 4: Mastered areas (green spectrum) -->
+    <rect x="0"   y="204" width="90"  height="58" rx="10" fill="#22c55e" opacity="0.92"/>
+    <rect x="100" y="204" width="160" height="58" rx="10" fill="#16a34a" opacity="0.92"/>
+    <rect x="270" y="204" width="130" height="58" rx="10" fill="#15803d" opacity="0.92"/>
   </g>
-  <!-- "大学物語" text -->
-  <text x="256" y="340" text-anchor="middle" font-family="'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" font-size="80" font-weight="900" fill="white" letter-spacing="4">大学物語</text>
+
+  <!-- Brand name -->
+  <text x="256" y="375" text-anchor="middle"
+        font-family="'Hiragino Kaku Gothic ProN','Noto Sans JP','Yu Gothic',sans-serif"
+        font-size="76" font-weight="900" fill="white" letter-spacing="8">大学物語</text>
+
   <!-- Tagline -->
-  <text x="256" y="390" text-anchor="middle" font-family="'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" font-size="24" fill="#9ca3af">共通テスト攻略マップ</text>
+  <text x="256" y="418" text-anchor="middle"
+        font-family="'Hiragino Kaku Gothic ProN','Noto Sans JP','Yu Gothic',sans-serif"
+        font-size="22" fill="#9ca3af" letter-spacing="2">弱点が見える。だから伸びる。</text>
+
   <!-- Bottom accent bar -->
-  <rect x="40" y="430" width="432" height="6" rx="3" fill="url(#accent)" opacity="0.8"/>
+  <rect x="56" y="450" width="400" height="5" rx="2.5" fill="url(#accent)" opacity="0.85"/>
 </svg>

@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
+import { PAGE_META, BRAND } from "@kyoutsu/shared";
 
 export const metadata: Metadata = {
-  title: "大学物語 — 弱点が見える。だから伸びる。",
-  description:
-    "共通テスト全9科目900点をS&P500スタイルのヒートマップで可視化。忘却曲線(SM-2)×弱点自動検出で東大・難関大合格への最短ルートを自動生成する無料学習プラットフォーム。",
+  title: PAGE_META.LP.title,
+  description: PAGE_META.LP.description,
   openGraph: {
-    title: "大学物語 — 弱点が見える。だから伸びる。",
-    description:
-      "共通テスト全9科目900点をヒートマップで可視化。忘却曲線×弱点自動検出で合格への最短ルートを自動生成。",
-    url: "https://daigaku-monogatari.pages.dev/lp",
+    title: PAGE_META.LP.title,
+    description: PAGE_META.LP.description,
+    url: `https://${BRAND.DOMAIN}/lp`,
   },
 };
 

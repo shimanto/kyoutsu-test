@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { TOTAL_MAX_SCORE, SUBJECTS } from "@kyoutsu/shared";
+import { TOTAL_MAX_SCORE, SUBJECTS, BRAND, CATCHCOPY, STATUS_COPY, getSeasonalCopy, getStageCopy } from "@kyoutsu/shared";
+import { LogoMark } from "@/components/brand/LogoMark";
 import { ScoreGauge } from "@/components/charts/ScoreGauge";
 import { ShareButton } from "@/components/share/ShareButton";
 import { getAuthUser, logout } from "@/lib/auth";
 import { apiGetOverview, apiGetDueCount } from "@/lib/api";
+import { SAMPLE_FIELD_STATS } from "@/lib/sample-data";
 
 interface FieldStat {
   field_id: string;
@@ -35,12 +37,31 @@ const SUBJECT_GROUPS = [
 const SUBJECT_MAX: Record<string, number> = {};
 SUBJECTS.forEach((s) => { SUBJECT_MAX[s.id] = s.maxScore; });
 
+/** APIデータがない場合にサンプルデータから OverviewData を生成 */
+function buildFallbackOverview(): OverviewData {
+  const subjectMap = new Map<string, { total: number; correct: number }>();
+  for (const f of SAMPLE_FIELD_STATS) {
+    const prev = subjectMap.get(f.subjectId) || { total: 0, correct: 0 };
+    subjectMap.set(f.subjectId, { total: prev.total + f.total, correct: prev.correct + f.correct });
+  }
+  return {
+    subjectStats: Array.from(subjectMap.entries()).map(([sid, s]) => ({
+      subject_id: sid, total: s.total, correct: s.correct,
+    })),
+    fieldStats: SAMPLE_FIELD_STATS.map((f) => ({
+      field_id: f.fieldId, field_name: f.fieldName, subject_id: f.subjectId,
+      total: f.total, correct: f.correct, points: f.points,
+    })),
+    targets: [],
+  };
+}
+
 function daysUntil(year: number): number {
   return Math.max(0, Math.ceil((new Date(`${year}-01-18`).getTime() - Date.now()) / 86400000));
 }
 
 function rateToColor(rate: number, total: number): string {
-  if (total < 3) return "#374151";
+  if (total < 1) return "#374151";
   if (rate <= 0.5) {
     const t = rate / 0.5;
     return `rgb(${Math.round(220 - t * 30)},${Math.round(38 + t * 185)},38)`;
@@ -68,7 +89,12 @@ export default function Home() {
       apiGetOverview().catch(() => null),
       apiGetDueCount().catch(() => ({ count: 0 })),
     ]).then(([ov, rc]) => {
-      if (ov) setOverview(ov);
+      // APIデータが有効ならそれを使う、なければ常にサンプルデータでフォールバック
+      if (ov && ov.fieldStats && ov.fieldStats.some((f: FieldStat) => f.total > 0)) {
+        setOverview(ov);
+      } else {
+        setOverview(buildFallbackOverview());
+      }
       setReviewCount(rc?.count || 0);
       setLoading(false);
     });
@@ -83,18 +109,28 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center"><div className="text-4xl animate-pulse mb-2">📚</div><p className="text-sm text-gray-500">学習マップを読み込み中...</p></div>
+        <div className="text-center">
+          <div className="flex justify-center animate-pulse mb-2">
+            <LogoMark className="w-10 h-10" />
+          </div>
+          <p className="text-sm text-gray-500">{STATUS_COPY.LOADING.headline}</p>
+          <p className="text-[10px] text-gray-600 mt-1">{STATUS_COPY.LOADING.sub}</p>
+        </div>
       </div>
     );
   }
 
-  if (!overview || overview.fieldStats.every((f) => f.total === 0)) {
+  if (!overview) {
+    const seasonal = getSeasonalCopy(new Date().getMonth() + 1);
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center max-w-sm">
-          <div className="text-5xl mb-4">📚🎯</div>
-          <h1 className="text-xl font-bold mb-2">学習を始めよう</h1>
-          <p className="text-gray-400 text-sm mb-6">まずは偏差値を入力して、あなたの現在地を把握しましょう。</p>
+          <div className="flex justify-center mb-4">
+            <LogoMark className="w-12 h-12" />
+          </div>
+          <h1 className="text-xl font-bold mb-2">{CATCHCOPY.ONBOARDING.headline}</h1>
+          <p className="text-gray-400 text-sm mb-4">{CATCHCOPY.ONBOARDING.sub}</p>
+          <p className="text-[10px] text-green-400/70 mb-6">{seasonal.headline}</p>
           <button onClick={() => router.push("/onboarding")}
             className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium">偏差値を入力してスタート</button>
         </div>
@@ -115,12 +151,20 @@ export default function Home() {
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-base font-bold">📚 大学物語</span>
+              <span className="flex items-center gap-1.5 font-bold text-base">
+                <LogoMark />
+                大学物語
+              </span>
               <span className="text-[10px] px-1.5 py-0.5 bg-gray-800 rounded text-gray-400">{authUser?.displayName}</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-red-400 font-bold">{remainingDays}日</span>
-              <button onClick={logout} className="text-gray-600 hover:text-gray-400">⏏</button>
+              <button
+                onClick={logout}
+                className="px-2 py-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-900/20 transition-colors text-[10px]"
+              >
+                ログアウト
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2 mt-1.5">
@@ -145,7 +189,7 @@ export default function Home() {
         {/* 弱点アラート */}
         {weakFields.length > 0 && (
           <div className="mb-3 p-2.5 bg-red-950/30 border border-red-900/30 rounded-xl">
-            <div className="text-[10px] text-red-400 font-bold mb-1.5">弱点 — クリックで強化</div>
+            <div className="text-[10px] text-red-400 font-bold mb-1.5">{CATCHCOPY.WEAKNESS.headline} — クリックで強化</div>
             <div className="flex gap-1.5">
               {weakFields.map((wf) => (
                 <button key={wf.field_id} onClick={() => router.push(`/drill/${wf.field_id}`)}
@@ -159,6 +203,18 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* ステージ別メッセージ */}
+        {(() => {
+          const overallRate = currentTotal / TOTAL_MAX_SCORE;
+          const stage = getStageCopy(overallRate);
+          return (
+            <div className="mb-3 px-3 py-2 bg-gray-900/50 border border-gray-800/50 rounded-xl">
+              <p className="text-xs font-bold text-green-400/80">{stage.headline}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">{stage.encouragement}</p>
+            </div>
+          );
+        })()}
 
         {/* ════ S&P500 ヒートマップ ════ */}
         <section>
@@ -262,6 +318,13 @@ export default function Home() {
             <span className="ml-2">ブロックサイズ = 配点</span>
           </div>
         </section>
+
+        {/* フッターリンク */}
+        <div className="mt-6 mb-4 flex items-center justify-center gap-4 text-[10px] text-gray-600">
+          <a href="/lp" className="hover:text-gray-400 transition-colors">サービス紹介</a>
+          <span>|</span>
+          <a href="/brand" className="hover:text-gray-400 transition-colors">ブランドガイド</a>
+        </div>
       </main>
 
       {/* ボトムナビ */}

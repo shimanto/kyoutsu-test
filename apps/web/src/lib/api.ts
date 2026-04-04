@@ -45,6 +45,13 @@ export async function apiDemoLogin(displayName: string) {
   );
 }
 
+export async function apiLineLogin(idToken: string) {
+  return apiFetch<{ token: string; userId: string }>(
+    "/auth/line-login",
+    { method: "POST", body: JSON.stringify({ idToken }) }
+  );
+}
+
 // ─── Users ───
 export async function apiGetMe() {
   return apiFetch<{

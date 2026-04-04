@@ -143,3 +143,45 @@
 | J | 実スクリーンショット撮影 | 高 | `apps/web/public/screenshots/` に配置が必要 |
 | K | OGP PNG実ファイル生成 | 高 | `node scripts/generate-og-png.js` を実行 |
 | L | App Store / PWAストア登録 | 低 | PWA対応済みなので容易だがユーザー数次第 |
+
+---
+
+## 8. 第5弾ブランディング施策 (2026-04-04)
+
+### 8.1 課題
+
+第4弾までで LP・キャッチコピー・ブランドボイスは整備されたが、以下が未対応:
+- 全15ページ中、メタデータ export があるのは LP の layout.tsx のみ
+- Google検索でのリッチスニペット（FAQ）が未設定
+- `PAGE_META` 定数に全ページ分が定義されていない
+
+### 8.2 実施内容
+
+| # | 施策 | 効果 | 詳細 |
+|---|------|------|------|
+| M | **全ページSEOメタデータ追加** | 検索性 +1, ブランド一貫性 | 10ルート（study, study/review, study/weakness, timekeeper, timekeeper/daily, analytics, admin, login, onboarding, dashboard）に `layout.tsx` + metadata export を追加。既存の drill/lp/study-session の layout も `PAGE_META` 定数を利用するよう統一 |
+| N | **PAGE_META 拡充** | 定数網羅性 | STUDY_REVIEW, STUDY_WEAKNESS, TIMEKEEPER_DAILY, ADMIN, LOGIN, DASHBOARD の6エントリを `PAGE_META` に追加 |
+| O | **FAQ構造化データ** | 検索リッチスニペット | `FAQ` 定数（5問）を `branding.ts` に定義。`FaqJsonLd` コンポーネントで JSON-LD 出力し LP に埋め込み |
+| P | **LP FAQセクション** | 離脱率低下, 認知度向上 | LP に折りたたみ式FAQセクションを追加。ユーザーの疑問を先回りして解消 |
+
+### 8.3 第5弾施策後のスコア
+
+| 評価軸 | 初期 | 第4弾後 | 第5弾後 | 改善施策 |
+|--------|------|---------|---------|---------|
+| 記憶容易性 | 4/5 | 4/5 | 4/5 | — (すでに良好) |
+| 機能想起 | 2/5 | 5/5 | 5/5 | — (維持) |
+| 差別化 | 3/5 | 4/5 | 5/5 | FAQ で「なぜ大学物語か」を明確に訴求 |
+| 検索性 | 2/5 | 4/5 | 5/5 | 全ページSEOメタデータ + FAQ構造化データ |
+| SNS映え | 4/5 | 5/5 | 5/5 | — (維持) |
+
+**累計改善: 15/25 → 24/25 (+60%)**
+
+### 8.4 残施策
+
+| # | 施策 | 優先度 | 備考 |
+|---|------|--------|------|
+| I | QRコード友達招待 | 中 | LINEログイン連動 |
+| J | 実スクリーンショット撮影 | 高 | `apps/web/public/screenshots/` に配置が必要 |
+| K | OGP PNG実ファイル生成 | 高 | `node scripts/generate-og-png.js` を実行 |
+| L | App Store / PWAストア登録 | 低 | PWA対応済みなので容易だがユーザー数次第 |
+| Q | 通知テンプレートのAPI連携 | 中 | `NOTIFICATION_COPY` をLINE Messaging APIに統合 |

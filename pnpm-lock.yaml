@@ -48,6 +48,9 @@ importers:
       '@liff/liff-types':
         specifier: ^2
         version: 2.28.0(tslib@2.8.1)
+      '@line/liff':
+        specifier: ^2.28.0
+        version: 2.28.0
       hono:
         specifier: ^4
         version: 4.12.9
@@ -917,6 +920,9 @@ packages:
   '@line/bot-sdk@10.6.0':
     resolution: {integrity: sha512-4hSpglL/G/cW2JCcohaYz/BS0uOSJNV9IEYdMm0EiPEvDLayoI2hGq2D86uYPQFD2gvgkyhmzdShpWLG3P5r3w==}
     engines: {node: '>=20'}
+
+  '@line/liff@2.28.0':
+    resolution: {integrity: sha512-A2BNIZDbDnBRBVTbHv32YB54T4aUDQyNyXv9y6Ut8w4yZLnGVabHtdhK9HSa1FmfmF9pSxhdSnBzULsDXF3vag==}
 
   '@next/env@15.5.14':
     resolution: {integrity: sha512-aXeirLYuASxEgi4X4WhfXsShCFxWDfNn/8ZeC5YXAS2BB4A8FJi1kwwGL6nvMVboE7fZCzmJPNdMvVHc8JpaiA==}
@@ -2226,6 +2232,9 @@ packages:
       jsdom:
         optional: true
 
+  whatwg-fetch@3.6.20:
+    resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
+
   why-is-node-running@2.3.0:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
     engines: {node: '>=8'}
@@ -3098,6 +3107,52 @@ snapshots:
       '@types/node': 24.12.0
     optionalDependencies:
       axios: 1.14.0
+    transitivePeerDependencies:
+      - debug
+
+  '@line/liff@2.28.0':
+    dependencies:
+      '@liff/analytics': 2.28.0(tslib@2.8.1)
+      '@liff/close-window': 2.28.0(tslib@2.8.1)
+      '@liff/consts': 2.28.0(tslib@2.8.1)
+      '@liff/core': 2.28.0(tslib@2.8.1)
+      '@liff/create-shortcut-on-home-screen': 2.28.0(tslib@2.8.1)
+      '@liff/extensions': 2.28.0(tslib@2.8.1)
+      '@liff/get-app-language': 2.28.0(tslib@2.8.1)
+      '@liff/get-friendship': 2.28.0(tslib@2.8.1)
+      '@liff/get-language': 2.28.0(tslib@2.8.1)
+      '@liff/get-line-version': 2.28.0(tslib@2.8.1)
+      '@liff/get-origins': 2.28.0(tslib@2.8.1)
+      '@liff/get-os': 2.28.0(tslib@2.8.1)
+      '@liff/get-profile': 2.28.0(tslib@2.8.1)
+      '@liff/get-version': 2.28.0(tslib@2.8.1)
+      '@liff/hooks': 2.28.0(tslib@2.8.1)
+      '@liff/i18n': 2.28.0(tslib@2.8.1)
+      '@liff/iap': 2.28.0(tslib@2.8.1)
+      '@liff/init': 2.28.0(tslib@2.8.1)
+      '@liff/is-api-available': 2.28.0(tslib@2.8.1)
+      '@liff/is-in-client': 2.28.0(tslib@2.8.1)
+      '@liff/is-logged-in': 2.28.0(tslib@2.8.1)
+      '@liff/is-sub-window': 2.28.0(tslib@2.8.1)
+      '@liff/liff-types': 2.28.0(tslib@2.8.1)
+      '@liff/login': 2.28.0(tslib@2.8.1)
+      '@liff/logout': 2.28.0(tslib@2.8.1)
+      '@liff/native-bridge': 2.28.0(tslib@2.8.1)
+      '@liff/open-window': 2.28.0(tslib@2.8.1)
+      '@liff/permanent-link': 2.28.0(tslib@2.8.1)
+      '@liff/permission': 2.28.0(tslib@2.8.1)
+      '@liff/ready': 2.28.0(tslib@2.8.1)
+      '@liff/request-friendship': 2.28.0(tslib@2.8.1)
+      '@liff/scan-code-v2': 2.28.0(tslib@2.8.1)
+      '@liff/send-messages': 2.28.0(tslib@2.8.1)
+      '@liff/server-api': 2.28.0(tslib@2.8.1)
+      '@liff/share-target-picker': 2.28.0(tslib@2.8.1)
+      '@liff/store': 2.28.0(tslib@2.8.1)
+      '@liff/sub-window': 2.28.0(tslib@2.8.1)
+      '@liff/use': 2.28.0(tslib@2.8.1)
+      '@liff/util': 2.28.0(tslib@2.8.1)
+      tslib: 2.8.1
+      whatwg-fetch: 3.6.20
     transitivePeerDependencies:
       - debug
 
@@ -4314,6 +4369,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  whatwg-fetch@3.6.20: {}
 
   why-is-node-running@2.3.0:
     dependencies:

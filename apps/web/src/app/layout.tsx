@@ -4,49 +4,51 @@ import { AuthGuard } from "@/components/layout/AuthGuard";
 import { ServiceWorkerRegister } from "@/components/layout/ServiceWorkerRegister";
 import { ErrorReporterInit } from "@/components/layout/ErrorReporterInit";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { BRAND, TAGLINE, CATCHCOPY } from "@kyoutsu/shared";
 
-// #7 OGP/SEO — ブランディング強化版
+// #7 OGP/SEO — ブランディング強化版 + キャッチコピー体系反映
 export const metadata: Metadata = {
   title: {
-    default: "大学物語 — 共通テスト攻略プラットフォーム",
-    template: "%s | 大学物語",
+    default: BRAND.FORMAL,
+    template: `%s | ${BRAND.NAME}`,
   },
   description:
-    "弱点が見える。だから伸びる。— 忘却曲線(SM-2)×弱点自動検出×S&P500スタイル学習マップで共通テスト全9科目900点を可視化。東大・難関大合格に向けた最短ルートを自動生成。",
+    `${TAGLINE.PRIMARY} — 忘却曲線(SM-2)×弱点自動検出×S&P500スタイル学習マップで共通テスト全9科目900点を可視化。東大・難関大合格に向けた最短ルートを自動生成。`,
   keywords: [
     "共通テスト", "共通テスト対策", "大学受験", "東大", "東京大学",
     "学習プラットフォーム", "忘却曲線", "SM-2", "弱点検出", "学習マップ",
     "大学物語", "受験勉強", "理系", "9科目", "ヒートマップ",
     "受験アプリ", "共通テスト アプリ", "大学受験 無料",
     "弱点克服", "復習計画", "受験計画",
+    "弱点が見える", "弱点可視化",
   ],
   openGraph: {
-    title: "大学物語 — 共通テスト攻略プラットフォーム",
+    title: BRAND.FORMAL,
     description:
-      "弱点が見える。だから伸びる。— 忘却曲線×弱点自動検出×学習マップで全9科目900点を可視化。志望大学合格への最短ルートを自動生成。",
-    url: "https://daigaku-monogatari.pages.dev",
-    siteName: "大学物語",
+      `${TAGLINE.PRIMARY} — ${CATCHCOPY.HERO.sub}`,
+    url: `https://${BRAND.DOMAIN}`,
+    siteName: BRAND.NAME,
     locale: "ja_JP",
     type: "website",
     images: [
       {
-        url: "https://daigaku-monogatari.pages.dev/og-image.png",
+        url: `https://${BRAND.DOMAIN}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "大学物語 — S&P500スタイル学習マップで共通テスト攻略",
+        alt: `${BRAND.NAME} — S&P500スタイル学習マップで共通テスト攻略`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "大学物語 — 弱点が見える。だから伸びる。",
-    description: "共通テスト全9科目をヒートマップで可視化。忘却曲線×弱点検出×学習マップで東大・難関大合格を目指す。",
-    images: ["https://daigaku-monogatari.pages.dev/og-image.png"],
+    title: `${BRAND.NAME} — ${TAGLINE.PRIMARY}`,
+    description: `${CATCHCOPY.FEATURES.sub}`,
+    images: [`https://${BRAND.DOMAIN}/og-image.png`],
   },
   robots: { index: true, follow: true },
   // #5 PWA
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, title: "大学物語", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: BRAND.NAME, statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
@@ -63,10 +65,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* #6 CSP */}
         <meta
           httpEquiv="Content-Security-Policy"
-          content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://kyoutsu-api.miyata-d23.workers.dev https://*.ingest.sentry.io; img-src 'self' data: https:; font-src 'self' data:;"
+          content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://kyoutsu-api.miyata-d23.workers.dev https://*.ingest.sentry.io https://api.line.me https://liff.line.me https://*.line-scdn.net; img-src 'self' data: https:; font-src 'self' data:;"
         />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>" type="image/svg+xml" sizes="any" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className="bg-gray-950 text-gray-100 min-h-screen">

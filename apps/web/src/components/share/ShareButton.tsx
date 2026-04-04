@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { getActiveSnsAccounts } from "@kyoutsu/shared";
 
 interface ShareButtonProps {
   /** 現在の推定得点 */
@@ -9,6 +10,29 @@ interface ShareButtonProps {
   targetScore: number;
   /** 各教科の推定得点 (表示用) */
   subjectScores?: { label: string; score: number; max: number }[];
+}
+
+function FollowCta() {
+  const accounts = getActiveSnsAccounts();
+  if (accounts.length === 0) return null;
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-800">
+      <p className="text-[10px] text-gray-500 mb-1.5">公式アカウントをフォロー</p>
+      <div className="flex gap-1.5">
+        {accounts.map((a) => (
+          <a
+            key={a.label}
+            href={a.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 text-center px-2 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-[10px] text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            {a.handle}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function buildShareText(current: number, target: number): string {
@@ -107,6 +131,9 @@ export function ShareButton({ currentScore, targetScore, subjectScores }: ShareB
                 <span>{copied ? "コピーしました!" : "テキストをコピー"}</span>
               </button>
             </div>
+
+            {/* SNSフォロー誘導 */}
+            <FollowCta />
           </div>
         </>
       )}
