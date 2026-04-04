@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getToken, getAuthUser, setAuthUser, type AuthUser } from "@/lib/auth";
 import { apiGetMe } from "@/lib/api";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/lp"];
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -16,7 +16,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const token = getToken();
 
     if (!token && !PUBLIC_PATHS.includes(pathname)) {
-      router.replace("/login");
+      router.replace("/lp");
       return;
     }
 

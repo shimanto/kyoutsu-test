@@ -1,0 +1,273 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { isLoggedIn } from "@/lib/auth";
+import { useEffect } from "react";
+
+const FEATURES = [
+  {
+    icon: "▣",
+    title: "S&P500スタイル学習マップ",
+    desc: "全9科目900点を配点比例のブロックで可視化。正答率に応じて赤→緑にリアルタイム変化。弱点が一目でわかる。",
+    color: "#22c55e",
+  },
+  {
+    icon: "🧠",
+    title: "忘却曲線 (SM-2) で最適復習",
+    desc: "科学的アルゴリズムが「今日復習すべき問題」を自動選出。覚えたことを忘れない仕組み。",
+    color: "#3b82f6",
+  },
+  {
+    icon: "🎯",
+    title: "弱点自動検出 & 重点ドリル",
+    desc: "正答率が低い分野を自動特定。苦手な分野だけを集中的に鍛えるドリルを生成。",
+    color: "#f97316",
+  },
+  {
+    icon: "🏃",
+    title: "タイムキーパー",
+    desc: "本番までの残り日数から逆算し、日次・週次・月次の学習計画を自動生成。",
+    color: "#8b5cf6",
+  },
+];
+
+const SUBJECTS = [
+  { name: "国語", score: 200, color: "#f97316" },
+  { name: "数学", score: 200, color: "#3b82f6" },
+  { name: "英語", score: 200, color: "#ec4899" },
+  { name: "理科", score: 200, color: "#14b8a6" },
+  { name: "社会", score: 100, color: "#eab308" },
+  { name: "情報", score: 100, color: "#06b6d4" },
+];
+
+const HEATMAP_DEMO = [
+  // 模擬ヒートマップブロック (row, col, rate)
+  { w: 3, h: 2, rate: 0.85 }, { w: 2, h: 2, rate: 0.42 }, { w: 2, h: 2, rate: 0.91 },
+  { w: 2, h: 1, rate: 0.67 }, { w: 3, h: 1, rate: 0.33 }, { w: 2, h: 1, rate: 0.78 },
+  { w: 2, h: 2, rate: 0.55 }, { w: 3, h: 2, rate: 0.95 }, { w: 2, h: 2, rate: 0.28 },
+];
+
+function rateToColor(rate: number): string {
+  if (rate <= 0.5) {
+    const t = rate / 0.5;
+    return `rgb(${Math.round(220 - t * 30)},${Math.round(38 + t * 185)},38)`;
+  }
+  const t = (rate - 0.5) / 0.5;
+  return `rgb(${Math.round(190 - t * 156)},${Math.round(223 - t * 26)},${Math.round(38 + t * 59)})`;
+}
+
+export default function LandingPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoggedIn()) router.replace("/");
+  }, [router]);
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      {/* ── Hero Section ── */}
+      <section className="relative overflow-hidden">
+        {/* 背景のヒートマップ装飾 */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="grid grid-cols-7 gap-1 p-4 h-full">
+            {HEATMAP_DEMO.concat(HEATMAP_DEMO).concat(HEATMAP_DEMO).map((block, i) => (
+              <div
+                key={i}
+                className="rounded-md"
+                style={{
+                  backgroundColor: rateToColor(block.rate),
+                  gridColumn: `span ${block.w}`,
+                  gridRow: `span ${block.h}`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-4xl mx-auto px-4 py-20 md:py-32 text-center">
+          <div className="text-6xl mb-4">📚</div>
+          <h1 className="text-4xl md:text-6xl font-black mb-3">
+            <span className="bg-gradient-to-r from-green-400 via-emerald-300 to-blue-400 bg-clip-text text-transparent">
+              大学物語
+            </span>
+          </h1>
+          <p className="text-lg md:text-xl text-gray-300 font-medium mb-2">
+            共通テスト攻略プラットフォーム
+          </p>
+          <p className="text-2xl md:text-3xl font-bold text-white mt-6 mb-8">
+            弱点が見える。だから伸びる。
+          </p>
+          <p className="text-sm md:text-base text-gray-400 max-w-xl mx-auto mb-10">
+            全9科目900点をS&P500スタイルのヒートマップで可視化。
+            忘却曲線に基づく最適な復習タイミングと弱点ドリルで、
+            東大・難関大合格への最短ルートを自動生成します。
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => router.push("/login")}
+              className="px-8 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-bold text-lg
+                         transition-all hover:scale-105 active:scale-95 shadow-lg shadow-green-600/20"
+            >
+              無料ではじめる
+            </button>
+            <a
+              href="#features"
+              className="px-8 py-3.5 border border-gray-700 hover:border-gray-500 rounded-xl font-medium
+                         transition-all hover:bg-gray-900"
+            >
+              機能を見る
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 科目バー ── */}
+      <section className="bg-gray-900/50 border-y border-gray-800/50 py-6">
+        <div className="max-w-4xl mx-auto px-4">
+          <p className="text-center text-xs text-gray-500 mb-3">対象: 共通テスト全9科目 / 900点満点</p>
+          <div className="flex justify-center gap-2 flex-wrap">
+            {SUBJECTS.map((s) => (
+              <div key={s.name} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800/50">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                <span className="text-xs font-medium">{s.name}</span>
+                <span className="text-[10px] text-gray-500">{s.score}点</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── デモ ヒートマップ ── */}
+      <section className="max-w-4xl mx-auto px-4 py-16">
+        <h2 className="text-center text-xl font-bold mb-2">学習マップで全科目を俯瞰</h2>
+        <p className="text-center text-sm text-gray-400 mb-8">
+          配点に比例したブロックサイズ。正答率で色が変化。弱点が一目瞭然。
+        </p>
+
+        {/* 模擬ヒートマップ */}
+        <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-3 gap-2">
+            {SUBJECTS.map((sub) => (
+              <div
+                key={sub.name}
+                className="rounded-xl border border-gray-800 overflow-hidden"
+                style={{ gridColumn: sub.score >= 200 ? "span 1" : "span 1" }}
+              >
+                <div className="px-2.5 py-1.5 border-b border-gray-800/50 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sub.color }} />
+                  <span className="font-bold text-xs">{sub.name}</span>
+                </div>
+                <div className="p-1.5 flex flex-wrap gap-1">
+                  {Array.from({ length: sub.score >= 200 ? 5 : 3 }, (_, i) => {
+                    const rate = [0.85, 0.42, 0.91, 0.33, 0.67][i % 5];
+                    return (
+                      <div
+                        key={i}
+                        className="rounded-md px-1.5 py-2 flex-1 min-w-[40px]"
+                        style={{ backgroundColor: rateToColor(rate) }}
+                      >
+                        <div className="text-[9px] font-mono font-bold text-center" style={{ color: rate > 0.6 ? "#052e16" : "#fff" }}>
+                          {Math.round(rate * 100)}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 凡例 */}
+          <div className="mt-3 flex items-center gap-2 justify-center text-[10px] text-gray-500">
+            <span>弱い</span>
+            <div className="flex gap-0.5">
+              {["#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fde68a", "#bef264", "#4ade80", "#22c55e"].map((c, i) => (
+                <div key={i} className="w-4 h-2.5 rounded-sm" style={{ backgroundColor: c }} />
+              ))}
+            </div>
+            <span>習得済み</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features ── */}
+      <section id="features" className="max-w-4xl mx-auto px-4 py-16">
+        <h2 className="text-center text-xl font-bold mb-2">大学物語の4つの武器</h2>
+        <p className="text-center text-sm text-gray-400 mb-10">科学×可視化で、闇雲な勉強から卒業する</p>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          {FEATURES.map((f) => (
+            <div key={f.title} className="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition-colors">
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
+                  style={{ backgroundColor: `${f.color}20`, color: f.color }}
+                >
+                  {f.icon}
+                </div>
+                <h3 className="font-bold">{f.title}</h3>
+              </div>
+              <p className="text-sm text-gray-400 leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── How it works ── */}
+      <section className="bg-gray-900/30 border-y border-gray-800/50 py-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <h2 className="text-center text-xl font-bold mb-10">3ステップではじめる</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { step: "1", title: "偏差値を入力", desc: "現在の模試偏差値と志望大学を選択。あなたの現在地を把握します。", icon: "📝" },
+              { step: "2", title: "学習マップを確認", desc: "全科目のヒートマップが生成。弱点がひと目でわかります。", icon: "🗺" },
+              { step: "3", title: "毎日の課題をこなす", desc: "忘却曲線が最適な復習タイミングを自動計算。やるべきことが明確に。", icon: "✅" },
+            ].map((s) => (
+              <div key={s.step} className="text-center">
+                <div className="text-3xl mb-3">{s.icon}</div>
+                <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-600/20 text-green-400 font-bold text-sm mb-2">
+                  {s.step}
+                </div>
+                <h3 className="font-bold mb-1">{s.title}</h3>
+                <p className="text-sm text-gray-400">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section className="max-w-4xl mx-auto px-4 py-20 text-center">
+        <h2 className="text-2xl md:text-3xl font-bold mb-3">
+          弱点が見える。だから伸びる。
+        </h2>
+        <p className="text-gray-400 text-sm mb-8 max-w-md mx-auto">
+          共通テスト全9科目をヒートマップで可視化し、
+          忘却曲線で最適な学習計画を自動生成。
+          合格への最短ルートを歩み始めましょう。
+        </p>
+        <button
+          onClick={() => router.push("/login")}
+          className="px-10 py-4 bg-green-600 hover:bg-green-700 rounded-xl font-bold text-lg
+                     transition-all hover:scale-105 active:scale-95 shadow-lg shadow-green-600/20"
+        >
+          無料ではじめる
+        </button>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="border-t border-gray-800 py-8">
+        <div className="max-w-4xl mx-auto px-4 text-center text-xs text-gray-600">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-base">📚</span>
+            <span className="font-bold text-gray-400">大学物語</span>
+            <span className="text-gray-600">— 弱点が見える。だから伸びる。</span>
+          </div>
+          <p>Developed by Shimanto AI</p>
+          <p className="mt-1">daigaku-monogatari.pages.dev</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
