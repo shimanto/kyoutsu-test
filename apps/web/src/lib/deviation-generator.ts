@@ -53,17 +53,38 @@ export interface GeneratedOverview {
   targets: { subject_id: string; target_score: number }[];
 }
 
+/** 教科の得意不得意をlocalStorageから読み取る */
+function loadSubjectStrengths(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem("kyoutsu_subject_strength");
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+/** 教科IDから強弱グループを解決 */
+const SUBJECT_TO_GROUP: Record<string, string> = {
+  kokugo: "kokugo", math1a: "math", math2bc: "math",
+  eng_read: "english", eng_listen: "english",
+  physics: "science", chemistry: "science",
+  social: "social", info1: "social",
+};
+
 /**
  * 偏差値からヒートマップ用の OverviewData を生成
+ * 教科の得意不得意設定も反映する
  */
 export function generateOverviewFromDeviation(deviation: number): GeneratedOverview {
   const base = deviationToBaseRate(deviation);
   const rng = seedRandom(deviation * 137);
+  const strengths = loadSubjectStrengths();
 
-  // 科目別ベースレート
+  // 科目別ベースレート（得意不得意を反映: -2〜+2 → -0.10〜+0.10 の補正）
   const subjectRates: Record<string, number> = {};
   for (const [sid, offset] of Object.entries(SUBJECT_OFFSETS)) {
-    subjectRates[sid] = clamp(base + offset + rng() * 0.04, 0.15, 0.98);
+    const group = SUBJECT_TO_GROUP[sid] || sid;
+    const strengthBonus = (strengths[group] || 0) * 0.05;
+    subjectRates[sid] = clamp(base + offset + strengthBonus + rng() * 0.04, 0.15, 0.98);
   }
 
   // 分野別バラつき生成

@@ -6,11 +6,29 @@ import { SUBJECTS } from "@kyoutsu/shared";
 import { apiGenerateTestData, apiGeneratePlan } from "@/lib/api";
 import { getAuthUser, setAuthUser } from "@/lib/auth";
 
-const UNIVERSITY_PRESETS = [
+const TODAI_PRESETS = [
   { id: "todai_rika1", name: "東京大学 理科一類", targetTotal: 780, bunrui: "rika1" },
   { id: "todai_rika2", name: "東京大学 理科二類", targetTotal: 770, bunrui: "rika2" },
   { id: "todai_rika3", name: "東京大学 理科三類", targetTotal: 830, bunrui: "rika3" },
-  { id: "custom", name: "その他の大学", targetTotal: 700, bunrui: "rika1" },
+];
+
+/** 関東圏 理系 難関国公立 上位10 */
+const KANTO_RIKA_PRESETS = [
+  { id: "titech",     name: "東京工業大学",         targetTotal: 720, bunrui: "rika1" },
+  { id: "hitotsubashi_sci", name: "一橋大学 (理系併願)", targetTotal: 740, bunrui: "rika1" },
+  { id: "tohoku",     name: "東北大学 理学部",       targetTotal: 700, bunrui: "rika1" },
+  { id: "tsukuba",    name: "筑波大学 理工学群",     targetTotal: 690, bunrui: "rika1" },
+  { id: "chiba",      name: "千葉大学 工学部",       targetTotal: 670, bunrui: "rika1" },
+  { id: "yokohama",   name: "横浜国立大学 理工学部", targetTotal: 670, bunrui: "rika1" },
+  { id: "ochanomizu", name: "お茶の水女子大学 理学部", targetTotal: 680, bunrui: "rika1" },
+  { id: "noukou",     name: "東京農工大学 工学部",   targetTotal: 650, bunrui: "rika1" },
+  { id: "denki",      name: "電気通信大学",         targetTotal: 640, bunrui: "rika1" },
+  { id: "gakugei",    name: "東京学芸大学 理系",     targetTotal: 630, bunrui: "rika1" },
+];
+
+const UNIVERSITY_PRESETS = [
+  ...TODAI_PRESETS,
+  { id: "other", name: "その他の難関国公立（理系）", targetTotal: 700, bunrui: "rika1" },
 ];
 
 export default function OnboardingPage() {
@@ -18,6 +36,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [selectedUniv, setSelectedUniv] = useState(UNIVERSITY_PRESETS[0]);
   const [deviation, setDeviation] = useState(60);
+  const [showKanto, setShowKanto] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{
     estimatedTotal: number;
@@ -71,21 +90,51 @@ export default function OnboardingPage() {
           <div>
             <h1 className="text-2xl font-bold mb-2">志望大学を選択</h1>
             <p className="text-gray-400 text-sm mb-6">目標点数と学習計画の基準になります</p>
-            <div className="space-y-3">
-              {UNIVERSITY_PRESETS.map((univ) => (
-                <button
-                  key={univ.id}
-                  onClick={() => setSelectedUniv(univ)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
-                    selectedUniv.id === univ.id
-                      ? "border-green-500 bg-green-500/10" : "border-gray-700 bg-gray-900 hover:border-gray-600"
-                  }`}
-                >
-                  <div className="font-medium">{univ.name}</div>
-                  <div className="text-sm text-gray-400">目標: {univ.targetTotal} / {totalMax}</div>
+
+            {!showKanto ? (
+              <>
+                {/* 東大 + その他 */}
+                <div className="space-y-2">
+                  {TODAI_PRESETS.map((univ) => (
+                    <button key={univ.id}
+                      onClick={() => { setSelectedUniv(univ); setShowKanto(false); }}
+                      className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
+                        selectedUniv.id === univ.id ? "border-green-500 bg-green-500/10" : "border-gray-700 bg-gray-900 hover:border-gray-600"
+                      }`}>
+                      <div className="font-medium">{univ.name}</div>
+                      <div className="text-sm text-gray-400">目標: {univ.targetTotal} / {totalMax}</div>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setShowKanto(true)}
+                  className="w-full mt-3 text-left px-4 py-3 rounded-lg border border-blue-700/50 bg-blue-900/10 hover:bg-blue-900/20 transition-colors">
+                  <div className="font-medium text-blue-400">その他の難関国公立（理系）</div>
+                  <div className="text-sm text-gray-500">関東圏の理系難関10校から選択</div>
                 </button>
-              ))}
-            </div>
+              </>
+            ) : (
+              <>
+                {/* 関東圏理系難関10校 */}
+                <button onClick={() => setShowKanto(false)}
+                  className="text-sm text-gray-500 hover:text-gray-300 mb-3 flex items-center gap-1">
+                  ← 東京大学に戻る
+                </button>
+                <p className="text-xs text-blue-400 font-bold mb-3">関東圏 理系 難関国公立 上位10</p>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {KANTO_RIKA_PRESETS.map((univ) => (
+                    <button key={univ.id}
+                      onClick={() => setSelectedUniv(univ)}
+                      className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
+                        selectedUniv.id === univ.id ? "border-blue-500 bg-blue-500/10" : "border-gray-700 bg-gray-900 hover:border-gray-600"
+                      }`}>
+                      <div className="font-medium">{univ.name}</div>
+                      <div className="text-sm text-gray-400">目標: {univ.targetTotal} / {totalMax}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
             <button onClick={() => setStep(2)}
               className="w-full mt-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors">
               次へ

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大学物語 管理画面</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwindcss.config={theme:{extend:{colors:{bg:'#030712',card:'#0f172a'}}}}</script>
+  <style>body{background:#030712;color:#e5e7eb;font-family:system-ui,sans-serif}</style>
+</head>
+<body class="min-h-screen">
+  <div id="app"></div>
+  <script>
+const API = "https://kyoutsu-api.miyata-d23.workers.dev";
+let TOKEN = localStorage.getItem("admin_token") || "";
+
+// ── API helpers ──
+async function api(path, opts = {}) {
+  const res = await fetch(`${API}${path}`, {
+    ...opts,
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${TOKEN}`, ...(opts.headers || {}) },
+  });
+  if (res.status === 401) { TOKEN = ""; localStorage.removeItem("admin_token"); renderLogin(); throw new Error("Unauthorized"); }
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+}
+
+// ── State ──
+let currentTab = "dashboard";
+
+// ── Render ──
+function render() {
+  if (!TOKEN) { renderLogin(); return; }
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <header class="sticky top-0 z-50 bg-gray-950/95 backdrop-blur border-b border-gray-800 px-4 py-2">
+      <div class="max-w-6xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="font-bold text-sm">🎛 大学物語 管理画面</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-500">kanri.daimono.pages.dev</span>
+          <button onclick="doLogout()" class="text-xs text-gray-500 hover:text-red-400 px-2 py-1">ログアウト</button>
+        </div>
+      </div>
+    </header>
+    <div class="max-w-6xl mx-auto flex gap-4 p-4">
+      <nav class="w-48 shrink-0 space-y-1">
+        ${["dashboard","users","login-history","notify","feedback"].map(t =>
+          `<button onclick="switchTab('${t}')" class="w-full text-left px-3 py-2 rounded-lg text-sm ${currentTab===t?"bg-green-600/20 text-green-400 font-medium":"text-gray-400 hover:bg-gray-800"}">${{
+            dashboard:"ダッシュボード",users:"ユーザー管理","login-history":"ログイン履歴",notify:"LINE通知",feedback:"フィードバック"
+          }[t]}</button>`
+        ).join("")}
+      </nav>
+      <main id="content" class="flex-1 min-w-0"></main>
+    </div>`;
+  loadTab();
+}
+
+function switchTab(tab) { currentTab = tab; render(); }
+
+async function loadTab() {
+  const el = document.getElementById("content");
+  el.innerHTML = '<div class="text-center py-8 text-gray-500">読み込み中...</div>';
+  try {
+    if (currentTab === "dashboard") await renderDashboard(el);
+    else if (currentTab === "users") await renderUsers(el);
+    else if (currentTab === "login-history") await renderLoginHistory(el);
+    else if (currentTab === "notify") renderNotify(el);
+    else if (currentTab === "feedback") await renderFeedback(el);
+  } catch (e) { el.innerHTML = `<div class="text-red-400 p-4">${e.message}</div>`; }
+}
+
+// ── Dashboard ──
+async function renderDashboard(el) {
+  const d = await api("/admin/dashboard");
+  const rate = d.totalAnswers > 0 ? Math.round(d.correctAnswers / d.totalAnswers * 100) : 0;
+  el.innerHTML = `
+    <h2 class="text-lg font-bold mb-4">ダッシュボード</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      ${statCard("ユーザー数", d.totalUsers, "text-blue-400")}
+      ${statCard("セッション数", d.totalSessions, "text-green-400")}
+      ${statCard("総回答数", d.totalAnswers, "text-purple-400")}
+      ${statCard("正答率", rate + "%", "text-amber-400")}
+    </div>
+    <h3 class="text-sm font-bold text-gray-400 mb-2">最近のユーザー</h3>
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-gray-800 text-gray-500 text-xs">
+          <th class="text-left px-4 py-2">名前</th><th class="text-left px-4 py-2">登録日</th>
+        </tr></thead>
+        <tbody>${d.recentUsers.map(u =>
+          `<tr class="border-b border-gray-800/50"><td class="px-4 py-2">${esc(u.display_name)}</td><td class="px-4 py-2 text-gray-500">${u.created_at||"-"}</td></tr>`
+        ).join("")}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Users ──
+async function renderUsers(el) {
+  const d = await api("/admin/users?limit=100");
+  el.innerHTML = `
+    <h2 class="text-lg font-bold mb-4">ユーザー管理 <span class="text-sm text-gray-500 font-normal">(${d.total}人)</span></h2>
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead><tr class="border-b border-gray-800 text-gray-500">
+          <th class="text-left px-3 py-2">名前</th>
+          <th class="text-left px-3 py-2">方式</th>
+          <th class="text-left px-3 py-2">志望</th>
+          <th class="text-left px-3 py-2">目標</th>
+          <th class="text-left px-3 py-2">受験年</th>
+          <th class="text-left px-3 py-2">登録日</th>
+          <th class="text-left px-3 py-2">操作</th>
+        </tr></thead>
+        <tbody>${d.users.map(u => `
+          <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+            <td class="px-3 py-2 font-medium">${esc(u.display_name)}</td>
+            <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${u.line_user_id?.startsWith("demo-")?"bg-gray-700 text-gray-400":"bg-green-900/50 text-green-400"}">${u.line_user_id?.startsWith("demo-")?"Demo":"LINE"}</span></td>
+            <td class="px-3 py-2 text-gray-400">${u.target_bunrui||"-"}</td>
+            <td class="px-3 py-2">${u.target_total_score||"-"}/900</td>
+            <td class="px-3 py-2 text-gray-400">${u.exam_year||"-"}</td>
+            <td class="px-3 py-2 text-gray-500">${(u.created_at||"").slice(0,10)}</td>
+            <td class="px-3 py-2"><button onclick="viewUserStats('${u.id}')" class="text-blue-400 hover:underline">統計</button></td>
+          </tr>
+        `).join("")}</tbody>
+      </table>
+    </div>
+    <div id="user-stats-modal"></div>`;
+}
+
+async function viewUserStats(userId) {
+  const d = await api(`/admin/users/${userId}/stats`);
+  const modal = document.getElementById("user-stats-modal");
+  const total = d.answers?.total || 0;
+  const correct = d.answers?.correct || 0;
+  const rate = total > 0 ? Math.round(correct / total * 100) : 0;
+  modal.innerHTML = `
+    <div class="mt-4 bg-gray-900 rounded-xl border border-blue-800/30 p-4">
+      <h3 class="text-sm font-bold text-blue-400 mb-3">ユーザー統計</h3>
+      <div class="grid grid-cols-3 gap-3">
+        ${statCard("セッション", d.sessions?.count||0, "text-green-400")}
+        ${statCard("回答数", total, "text-purple-400")}
+        ${statCard("正答率", rate+"%", "text-amber-400")}
+      </div>
+    </div>`;
+}
+
+// ── Login History ──
+async function renderLoginHistory(el) {
+  const d = await api("/admin/login-history?limit=100");
+  el.innerHTML = `
+    <h2 class="text-lg font-bold mb-4">ログイン履歴</h2>
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead><tr class="border-b border-gray-800 text-gray-500">
+          <th class="text-left px-3 py-2">名前</th>
+          <th class="text-left px-3 py-2">方式</th>
+          <th class="text-left px-3 py-2">LINE ID</th>
+          <th class="text-left px-3 py-2">初回ログイン</th>
+          <th class="text-left px-3 py-2">最終アクティブ</th>
+        </tr></thead>
+        <tbody>${d.history.map(h => `
+          <tr class="border-b border-gray-800/50">
+            <td class="px-3 py-2 font-medium">${esc(h.display_name)}</td>
+            <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${h.login_method==="demo"?"bg-gray-700 text-gray-400":"bg-green-900/50 text-green-400"}">${h.login_method==="demo"?"Demo":"LINE"}</span></td>
+            <td class="px-3 py-2 text-gray-500 font-mono text-[10px]">${h.line_user_id?.startsWith("demo-")?"(demo)":h.line_user_id?.slice(0,8)+"..."}</td>
+            <td class="px-3 py-2 text-gray-400">${(h.first_login||"").slice(0,16)}</td>
+            <td class="px-3 py-2 text-gray-400">${(h.last_active||"").slice(0,16)}</td>
+          </tr>
+        `).join("")}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── LINE Notify ──
+function renderNotify(el) {
+  el.innerHTML = `
+    <h2 class="text-lg font-bold mb-4">LINE通知送信</h2>
+    <div class="space-y-4">
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h3 class="text-sm font-bold text-green-400 mb-3">ブロードキャスト (全ユーザー)</h3>
+        <textarea id="broadcast-msg" rows="4" placeholder="通知メッセージを入力..." class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm resize-none focus:border-green-500 focus:outline-none"></textarea>
+        <div class="flex items-center justify-between mt-3">
+          <p class="text-[10px] text-gray-500">LINE Messaging API 経由で全ユーザーに送信</p>
+          <button onclick="sendBroadcast()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition-colors">送信</button>
+        </div>
+        <div id="broadcast-result" class="mt-2"></div>
+      </div>
+
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h3 class="text-sm font-bold text-blue-400 mb-3">テンプレート</h3>
+        <div class="space-y-2">
+          ${[
+            {label:"復習リマインド",msg:"📚 今日の復習が待っています。忘れる前に取り戻そう！\\nhttps://daigaku-monogatari.pages.dev"},
+            {label:"新機能のお知らせ",msg:"🎉 大学物語に新機能が追加されました！\\nぜひお試しください。\\nhttps://daigaku-monogatari.pages.dev"},
+            {label:"応援メッセージ",msg:"💪 共通テストまであと少し！毎日の積み重ねが力になります。\\n今日も一緒に頑張りましょう。"},
+          ].map(t => `
+            <button onclick="document.getElementById('broadcast-msg').value='${t.msg}'" class="w-full text-left px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-xs">
+              <span class="text-gray-300">${t.label}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h3 class="text-sm font-bold text-purple-400 mb-3">レポート送信</h3>
+        <button onclick="sendReport()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors">週次レポートを生成して送信</button>
+        <div id="report-result" class="mt-2"></div>
+      </div>
+    </div>`;
+}
+
+async function sendBroadcast() {
+  const msg = document.getElementById("broadcast-msg").value.trim();
+  if (!msg) return;
+  const el = document.getElementById("broadcast-result");
+  el.innerHTML = '<span class="text-xs text-gray-400">送信中...</span>';
+  try {
+    const res = await api("/admin/line-notify", { method: "POST", body: JSON.stringify({ broadcast: true, message: msg }) });
+    el.innerHTML = `<span class="text-xs text-green-400">送信完了 (status: ${res.status})</span>`;
+  } catch (e) { el.innerHTML = `<span class="text-xs text-red-400">エラー: ${e.message}</span>`; }
+}
+
+async function sendReport() {
+  const el = document.getElementById("report-result");
+  el.innerHTML = '<span class="text-xs text-gray-400">レポート生成中...</span>';
+  try {
+    const d = await api("/admin/dashboard");
+    const rate = d.totalAnswers > 0 ? Math.round(d.correctAnswers / d.totalAnswers * 100) : 0;
+    const msg = `📊 大学物語 週次レポート\n\n👥 ユーザー数: ${d.totalUsers}人\n📝 総セッション: ${d.totalSessions}\n✅ 総回答数: ${d.totalAnswers}\n🎯 平均正答率: ${rate}%\n\nhttps://daigaku-monogatari.pages.dev`;
+    await api("/admin/line-notify", { method: "POST", body: JSON.stringify({ broadcast: true, message: msg }) });
+    el.innerHTML = '<span class="text-xs text-green-400">レポートを送信しました</span>';
+  } catch (e) { el.innerHTML = `<span class="text-xs text-red-400">エラー: ${e.message}</span>`; }
+}
+
+// ── Feedback ──
+async function renderFeedback(el) {
+  let d;
+  try { d = await api("/feedback/all?status=new&limit=50"); } catch { d = { feedback: [] }; }
+  el.innerHTML = `
+    <h2 class="text-lg font-bold mb-4">フィードバック <span class="text-sm text-gray-500 font-normal">(${d.feedback.length}件)</span></h2>
+    ${d.feedback.length === 0 ? '<p class="text-gray-500 text-sm">新規フィードバックはありません</p>' : `
+    <div class="space-y-3">${d.feedback.map(f => `
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium">${esc(f.display_name||"匿名")}</span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500">${f.category}</span>
+            <span class="text-xs text-yellow-400">${"★".repeat(f.rating)}${"☆".repeat(5-f.rating)}</span>
+          </div>
+        </div>
+        <p class="text-sm text-gray-300">${esc(f.body)}</p>
+        <div class="flex items-center justify-between mt-2">
+          <span class="text-[10px] text-gray-600">${(f.created_at||"").slice(0,16)}</span>
+          <button onclick="resolveFeedback('${f.id}')" class="text-[10px] text-green-400 hover:underline">対応済みにする</button>
+        </div>
+      </div>
+    `).join("")}</div>`}`;
+}
+
+async function resolveFeedback(id) {
+  await api(`/feedback/${id}`, { method: "PATCH", body: JSON.stringify({ status: "resolved" }) });
+  loadTab();
+}
+
+// ── Login ──
+function renderLogin() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+          <div class="text-4xl mb-3">🎛</div>
+          <h1 class="text-2xl font-bold">大学物語 管理画面</h1>
+          <p class="text-sm text-gray-500 mt-1">管理者アカウントでログイン</p>
+        </div>
+        <div class="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div id="login-error"></div>
+          <label class="block text-xs text-gray-500 mb-1">名前 (管理者)</label>
+          <input id="admin-name" type="text" placeholder="admin" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-green-500 focus:outline-none text-sm mb-3">
+          <button onclick="doLogin()" class="w-full py-2.5 bg-green-600 hover:bg-green-700 rounded-lg font-medium text-sm transition-colors">ログイン</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function doLogin() {
+  const name = document.getElementById("admin-name").value.trim();
+  if (!name) return;
+  try {
+    const res = await fetch(`${API}/auth/demo-login`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayName: name }),
+    });
+    const data = await res.json();
+    TOKEN = data.token;
+    localStorage.setItem("admin_token", TOKEN);
+    render();
+  } catch (e) {
+    document.getElementById("login-error").innerHTML = `<p class="text-red-400 text-xs mb-3">${e.message}</p>`;
+  }
+}
+
+function doLogout() { TOKEN = ""; localStorage.removeItem("admin_token"); render(); }
+
+// ── Helpers ──
+function statCard(label, value, color) {
+  return `<div class="bg-gray-900 rounded-xl border border-gray-800 p-4 text-center">
+    <div class="text-xs text-gray-500">${label}</div>
+    <div class="text-2xl font-mono font-bold ${color} mt-1">${value}</div>
+  </div>`;
+}
+function esc(s) { if (!s) return ""; const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+// ── Init ──
+render();
+  </script>
+</body>
+</html>

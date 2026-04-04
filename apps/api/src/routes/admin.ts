@@ -308,4 +308,113 @@ admin.post("/predictions/calculate", async (c) => {
   });
 });
 
+// ─── ユーザー管理 ───
+
+admin.get("/users", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") || 50), 200);
+  const offset = Number(c.req.query("offset") || 0);
+  const result = await c.env.DB.prepare(`
+    SELECT id, line_user_id, display_name, picture_url, target_bunrui,
+           target_total_score, exam_year, role, created_at, updated_at
+    FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?
+  `).bind(limit, offset).all();
+  const countRes = await c.env.DB.prepare("SELECT COUNT(*) as total FROM users").first<{ total: number }>();
+  return c.json({ users: result.results, total: countRes?.total || 0 });
+});
+
+admin.get("/users/:id/stats", async (c) => {
+  const userId = c.req.param("id");
+  const [sessions, answers, reviews] = await Promise.all([
+    c.env.DB.prepare("SELECT COUNT(*) as count FROM study_sessions WHERE user_id = ?").bind(userId).first(),
+    c.env.DB.prepare("SELECT COUNT(*) as total, SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) as correct FROM answers WHERE user_id = ?").bind(userId).first(),
+    c.env.DB.prepare("SELECT COUNT(*) as count FROM review_schedules WHERE user_id = ?").bind(userId).first(),
+  ]);
+  return c.json({ sessions, answers, reviews });
+});
+
+// ─── ログイン履歴 (usersテーブルのcreated_at/updated_atで代用) ───
+
+admin.get("/login-history", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") || 100), 500);
+  const result = await c.env.DB.prepare(`
+    SELECT id, display_name, line_user_id,
+           CASE WHEN line_user_id LIKE 'demo-%' THEN 'demo' ELSE 'line' END as login_method,
+           created_at as first_login, updated_at as last_active
+    FROM users ORDER BY updated_at DESC LIMIT ?
+  `).bind(limit).all();
+  return c.json({ history: result.results });
+});
+
+// ─── LINE Messaging API ───
+
+admin.post("/line-notify", async (c) => {
+  const body = z.object({
+    targetUserIds: z.array(z.string()).optional(),
+    broadcast: z.boolean().default(false),
+    message: z.string().min(1).max(2000),
+  }).parse(await c.req.json());
+
+  const token = c.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
+  if (!token) {
+    return c.json({ error: "LINE Messaging API token not configured" }, 400);
+  }
+
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+  };
+
+  if (body.broadcast) {
+    // 全ユーザーに送信
+    const res = await fetch("https://api.line.me/v2/bot/message/broadcast", {
+      method: "POST", headers,
+      body: JSON.stringify({ messages: [{ type: "text", text: body.message }] }),
+    });
+    return c.json({ ok: res.ok, status: res.status });
+  }
+
+  if (body.targetUserIds?.length) {
+    // LINEユーザーIDを取得
+    const placeholders = body.targetUserIds.map(() => "?").join(",");
+    const users = await c.env.DB.prepare(
+      `SELECT line_user_id FROM users WHERE id IN (${placeholders}) AND line_user_id NOT LIKE 'demo-%'`
+    ).bind(...body.targetUserIds).all<{ line_user_id: string }>();
+
+    const lineUserIds = users.results.map((u) => u.line_user_id);
+    if (lineUserIds.length === 0) {
+      return c.json({ error: "No LINE users found in selection" }, 400);
+    }
+
+    // multicast (最大500人)
+    const res = await fetch("https://api.line.me/v2/bot/message/multicast", {
+      method: "POST", headers,
+      body: JSON.stringify({
+        to: lineUserIds.slice(0, 500),
+        messages: [{ type: "text", text: body.message }],
+      }),
+    });
+    return c.json({ ok: res.ok, status: res.status, sentTo: lineUserIds.length });
+  }
+
+  return c.json({ error: "targetUserIds or broadcast required" }, 400);
+});
+
+// ─── ダッシュボード統計 ───
+
+admin.get("/dashboard", async (c) => {
+  const [userCount, sessionCount, answerStats, recentUsers] = await Promise.all([
+    c.env.DB.prepare("SELECT COUNT(*) as count FROM users").first<{ count: number }>(),
+    c.env.DB.prepare("SELECT COUNT(*) as count FROM study_sessions").first<{ count: number }>(),
+    c.env.DB.prepare("SELECT COUNT(*) as total, SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) as correct FROM answers").first<{ total: number; correct: number }>(),
+    c.env.DB.prepare("SELECT id, display_name, created_at FROM users ORDER BY created_at DESC LIMIT 5").all(),
+  ]);
+  return c.json({
+    totalUsers: userCount?.count || 0,
+    totalSessions: sessionCount?.count || 0,
+    totalAnswers: answerStats?.total || 0,
+    correctAnswers: answerStats?.correct || 0,
+    recentUsers: recentUsers.results,
+  });
+});
+
 export default admin;

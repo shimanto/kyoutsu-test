@@ -180,6 +180,10 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-red-400 font-bold">{remainingDays}日</span>
+              <a href="/settings"
+                className="px-2 py-1 rounded-md text-gray-500 hover:text-blue-400 hover:bg-blue-900/20 transition-colors text-[10px]">
+                設定
+              </a>
               <button
                 onClick={logout}
                 className="px-2 py-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-900/20 transition-colors text-[10px]"
