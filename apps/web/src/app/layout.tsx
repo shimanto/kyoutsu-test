@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://daigaku-monogatari.pages.dev/og-image.svg",
+        url: "https://daigaku-monogatari.pages.dev/og-image.png",
         width: 1200,
         height: 630,
         alt: "大学物語 — S&P500スタイル学習マップで共通テスト攻略",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "大学物語 — 弱点が見える。だから伸びる。",
     description: "共通テスト全9科目をヒートマップで可視化。忘却曲線×弱点検出×学習マップで東大・難関大合格を目指す。",
-    images: ["https://daigaku-monogatari.pages.dev/og-image.svg"],
+    images: ["https://daigaku-monogatari.pages.dev/og-image.png"],
   },
   robots: { index: true, follow: true },
   // #5 PWA

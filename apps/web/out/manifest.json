@@ -15,6 +15,28 @@
   "categories": ["education"],
   "lang": "ja",
   "dir": "ltr",
-  "screenshots": [],
+  "screenshots": [
+    {
+      "src": "/screenshots/heatmap-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "学習マップ — S&P500スタイルのヒートマップで全科目を俯瞰"
+    },
+    {
+      "src": "/screenshots/heatmap-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "学習マップ — デスクトップ版ヒートマップビュー"
+    },
+    {
+      "src": "/screenshots/timekeeper-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "タイムキーパー — 本番までのロードマップと日次タスク"
+    }
+  ],
   "prefer_related_applications": false
 }

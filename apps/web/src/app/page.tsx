@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TOTAL_MAX_SCORE, SUBJECTS } from "@kyoutsu/shared";
 import { ScoreGauge } from "@/components/charts/ScoreGauge";
+import { ShareButton } from "@/components/share/ShareButton";
 import { getAuthUser, logout } from "@/lib/auth";
 import { apiGetOverview, apiGetDueCount } from "@/lib/api";
 
@@ -138,6 +139,7 @@ export default function Home() {
           <QuickBtn href="/timekeeper" icon="🏃" label="ロードマップ" accent="#3b82f6" />
           <QuickBtn href="/analytics" icon="📊" label="分析" accent="#8b5cf6" />
           <QuickBtn href="/admin" icon="⚙" label="管理" accent="#6b7280" />
+          <ShareButton currentScore={currentTotal} targetScore={targetTotal} />
         </div>
 
         {/* 弱点アラート */}

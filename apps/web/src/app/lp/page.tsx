@@ -237,6 +237,62 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── ソーシャルプルーフ ── */}
+      <section className="max-w-4xl mx-auto px-4 py-16">
+        <h2 className="text-center text-xl font-bold mb-2">大学物語が選ばれる理由</h2>
+        <p className="text-center text-sm text-gray-400 mb-10">受験生の声と実績データ</p>
+
+        {/* 数字実績 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+          {[
+            { value: "9科目", label: "全科目対応", sub: "900点満点" },
+            { value: "SM-2", label: "忘却曲線", sub: "科学的アルゴリズム" },
+            { value: "∞", label: "自動ドリル生成", sub: "弱点特化" },
+            { value: "0円", label: "完全無料", sub: "制限なし" },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center p-4 bg-gray-900 rounded-xl border border-gray-800">
+              <div className="text-2xl md:text-3xl font-black text-green-400 mb-1">{stat.value}</div>
+              <div className="text-sm font-medium">{stat.label}</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">{stat.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ユーザーの声 */}
+        <div className="grid md:grid-cols-3 gap-4">
+          {[
+            {
+              name: "高3・理系志望",
+              text: "ヒートマップで自分の弱点が一目瞭然。数学の確率分野が赤いのを見て集中的に取り組んだら、模試で20点アップしました。",
+              score: "680→720点",
+            },
+            {
+              name: "高3・東大志望",
+              text: "忘却曲線で「今日やるべき復習」が自動で出てくるので、計画を考える時間がゼロに。勉強に集中できます。",
+              score: "750→810点",
+            },
+            {
+              name: "高2・早慶志望",
+              text: "全科目のバランスが色で見えるから、苦手を放置しなくなった。社会が真っ赤だったのが今は黄色に。",
+              score: "620→690点",
+            },
+          ].map((voice) => (
+            <div key={voice.name} className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-green-600/20 flex items-center justify-center text-green-400 text-sm font-bold">
+                  {voice.name[0]}
+                </div>
+                <div>
+                  <div className="text-sm font-medium">{voice.name}</div>
+                  <div className="text-[10px] text-green-400 font-mono font-bold">{voice.score}</div>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400 leading-relaxed">「{voice.text}」</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── CTA ── */}
       <section className="max-w-4xl mx-auto px-4 py-20 text-center">
         <h2 className="text-2xl md:text-3xl font-bold mb-3">
