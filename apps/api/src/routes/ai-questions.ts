@@ -49,7 +49,7 @@ aiQuestions.post("/generate", async (c) => {
 - 日本語で出力すること`;
 
   try {
-    const res = await c.env.AI.run("@cf/meta/llama-3.1-8b-instruct" as BaseAiTextGenerationModels, {
+    const res = await c.env.AI.run("@cf/meta/llama-3.1-8b-instruct" as Parameters<typeof c.env.AI.run>[0], {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 1024,
     });
@@ -122,7 +122,7 @@ aiQuestions.post("/generate-variant", async (c) => {
 
   const prompt = `あなたは日本の大学入学共通テストの問題作成者です。
 
-以下の4択問題の「設問文」を書き換えて、「${newCorrectBody}」が正解になる新しい問題を作ってください。
+タスク: 以下の4択問題の「設問文だけ」を書き換えて、選択肢「${newCorrectBody}」が唯一の正解になる別の問題を作ってください。
 
 【元の問題】
 科目: ${subjectName} / 分野: ${fieldName}
@@ -130,36 +130,45 @@ aiQuestions.post("/generate-variant", async (c) => {
 選択肢:
 ${choicesText}
 元の正解: ${oldCorrect?.body || ""}
-新しい正解にしたい選択肢: ${newCorrectBody}
+新しく正解にしたい選択肢: ${newCorrectBody}
 
-【重要なルール】
-1. 選択肢は一切変更しない（そのまま使う）
-2. 設問文を書き換えて「${newCorrectBody}」が唯一の正解になるようにする
-3. 設問文は元の問題と同じ形式・トーンで、自然な日本語の問いかけにする
-4. 「${newCorrectBody}」の内容に対応する正しい問いかけを作る
+【ルール】
+1. 選択肢は一切変更しない。設問文だけを書き換える
+2. 「${newCorrectBody}」の特徴・定義・性質を問う設問文にする
+3. 他の3つの選択肢は明確に不正解になるようにする
+4. 共通テストらしい自然な日本語の問いかけにする
+5. 元の設問文とは異なる問い方にする（コピーしない）
 
-【禁止事項】
-- 「変形」「解き直し」「正解となる設問」「次のうち〜が正解」などのメタ的な表現は絶対に使わない
-- 元の設問文をそのまま残さない。必ず新しい正解に合った設問文に書き換える
-- 設問文に正解を直接含めない
+【禁止】
+- 「変形」「解き直し」「正解となる」等のメタ表現
+- 設問文に正解の選択肢テキストを直接含めること
+- 元の設問文をそのまま使うこと
 
-【例】
-元の問題: 「ケッペンの気候区分で、Afが示す気候帯はどれか。」（正解: 熱帯雨林気候）
-新しい正解: 地中海性気候
-→ 書き換え後: 「ケッペンの気候区分で、Csが示す気候帯はどれか。」
+【具体例】
+例1)
+元: 「ケッペンの気候区分で、Afが示す気候帯はどれか。」（正解: 熱帯雨林気候）
+新正解: 地中海性気候
+→ 「ケッペンの気候区分で、Csが示す気候帯はどれか。」
 
-元の問題: 「日本の初代内閣総理大臣は誰か。」（正解: 伊藤博文）
-新しい正解: 黒田清隆
-→ 書き換え後: 「日本の第2代内閣総理大臣は誰か。」
+例2)
+元: 「日本の初代内閣総理大臣は誰か。」（正解: 伊藤博文）
+新正解: 黒田清隆
+→ 「日本の第2代内閣総理大臣は誰か。」
 
-以下のJSON形式で出力してください。JSON以外は出力しないでください。
+例3)
+元: 「プレートの境界のうち、海溝が形成されるのはどのような境界か。」（正解: 収束境界）
+新正解: すれ違い境界（トランスフォーム断層）
+→ 「プレートの境界のうち、プレート同士が水平にすれ違う境界はどれか。」
+
+JSON形式のみ出力してください:
 {
-  "body": "書き換えた設問文（元と同じ形式で自然な問いかけ）",
-  "explanation": "解説文。なぜ「${newCorrectBody}」が正解なのか、他の選択肢がなぜ不正解なのかを説明してください。"
+  "body": "新しい設問文",
+  "explanation": "なぜ${newCorrectBody}が正解か、他の選択肢がなぜ不正解かの解説"
 }`;
 
   try {
-    const res = await c.env.AI.run("@cf/meta/llama-3.1-8b-instruct" as BaseAiTextGenerationModels, {
+    // 70Bモデルで高品質な変形問題を生成
+    const res = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast" as Parameters<typeof c.env.AI.run>[0], {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 1024,
     });
@@ -174,6 +183,11 @@ ${choicesText}
     const parsed = JSON.parse(jsonMatch[0]);
     if (!parsed.body) {
       return c.json({ error: "Invalid variant format", raw: text.slice(0, 500) }, 500);
+    }
+
+    // 元の設問文がそのまま返された場合は失敗とみなす
+    if (parsed.body.trim() === originalBody.trim()) {
+      return c.json({ error: "AI returned original question unchanged", raw: text.slice(0, 200) }, 500);
     }
 
     return c.json({

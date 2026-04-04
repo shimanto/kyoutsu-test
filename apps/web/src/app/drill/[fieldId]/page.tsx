@@ -189,8 +189,12 @@ function isValidVariantBody(newBody: string, originalBody: string): boolean {
   if (/変形|解き直し|正解となる|次のうち.*が正解/.test(newBody)) return false;
   // 元の問題文がそのまま含まれていたら無効（改行で連結されただけ）
   if (newBody.includes(originalBody)) return false;
+  // 元の問題文とほぼ同一（90%以上一致）なら無効
+  if (newBody.trim() === originalBody.trim()) return false;
   // 空や短すぎる場合は無効
   if (newBody.trim().length < 5) return false;
+  // 「?」マークだけや選択肢の羅列だけの場合は無効
+  if (!/[かどれなぜいつ？。]/.test(newBody)) return false;
   return true;
 }
 
@@ -713,9 +717,19 @@ function escapeRegex(s: string): string {
 function getCorrectReason(explanation: string, correctBody: string): string {
   // 解説中に正解テキストが含まれる文を探す
   const sentences = explanation.split(/[。．\n]/).filter(Boolean);
-  const match = sentences.find((s) => s.includes(correctBody));
+  // 「正解は「○○」」のようなメタ的な文はスキップ
+  const match = sentences.find((s) => s.includes(correctBody) && !/正解は[「『]/.test(s));
   if (match && match.length > correctBody.length + 5) {
     return match.replace(correctBody, "").trim().replace(/^[、。が]/,"");
+  }
+  // メタ文しかない場合、変形問題の解説から元の解説部分を探す
+  const afterMeta = explanation.split(/\n\n/).slice(1).join("\n\n");
+  if (afterMeta) {
+    const metaSentences = afterMeta.split(/[。．\n]/).filter(Boolean);
+    const metaMatch = metaSentences.find((s) => s.includes(correctBody));
+    if (metaMatch && metaMatch.length > correctBody.length + 5) {
+      return metaMatch.replace(correctBody, "").trim().replace(/^[、。が]/,"");
+    }
   }
   return "";
 }
