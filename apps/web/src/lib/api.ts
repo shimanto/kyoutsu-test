@@ -236,6 +236,22 @@ export async function apiGenerateAiQuestion(data: {
   }>("/ai-questions/generate", { method: "POST", body: JSON.stringify(data) });
 }
 
+// ─── Feedback ───
+export async function apiSubmitFeedback(data: {
+  category: string; rating: number; body: string; pageUrl?: string;
+}) {
+  return apiFetch<{ id: string }>("/feedback", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiGetMyFeedback() {
+  return apiFetch<{
+    feedback: {
+      id: string; category: string; rating: number; body: string;
+      page_url: string | null; status: string; created_at: string;
+    }[];
+  }>("/feedback/mine");
+}
+
 /** 変形問題生成: 選択肢はそのままで問題文を書き換え、別の選択肢が正解になるようにする */
 export async function apiGenerateVariantQuestion(data: {
   originalBody: string;

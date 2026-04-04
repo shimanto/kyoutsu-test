@@ -163,6 +163,12 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold">共通テスト攻略マップ</h1>
           <div className="flex items-center gap-3">
             <a
+              href="/feedback"
+              className="text-xs text-green-500/70 hover:text-green-400 transition-colors"
+            >
+              ご意見
+            </a>
+            <a
               href="/onboarding"
               className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
             >

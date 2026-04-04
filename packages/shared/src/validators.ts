@@ -42,3 +42,10 @@ export const recordReviewSchema = z.object({
 export const generatePlanSchema = z.object({
   weeklyStudyHours: z.number().min(1).max(80).default(20),
 });
+
+export const submitFeedbackSchema = z.object({
+  category: z.enum(["general", "bug", "feature", "content", "ui"]).default("general"),
+  rating: z.number().int().min(1).max(5),
+  body: z.string().min(1).max(2000),
+  pageUrl: z.string().max(500).optional(),
+});

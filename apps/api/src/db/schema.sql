@@ -181,6 +181,22 @@ CREATE TABLE IF NOT EXISTS notification_logs (
     line_message_id TEXT
 );
 
+-- 9. ユーザーフィードバック
+CREATE TABLE IF NOT EXISTS feedback (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    category TEXT NOT NULL DEFAULT 'general',
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    body TEXT NOT NULL,
+    page_url TEXT,
+    status TEXT NOT NULL DEFAULT 'new',
+    admin_note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status, created_at);
+
 -- インデックス
 CREATE INDEX IF NOT EXISTS idx_answers_user_question ON answers(user_id, question_id);
 CREATE INDEX IF NOT EXISTS idx_answers_session ON answers(session_id);
