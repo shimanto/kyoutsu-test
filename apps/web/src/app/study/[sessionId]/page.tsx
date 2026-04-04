@@ -1,69 +1,114 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  apiStartSession,
+  apiSubmitAnswer,
+  apiFinishSession,
+  apiRecordReview,
+  apiGetQuestion,
+} from "@/lib/api";
 
-// デモデータ
-const DEMO_QUESTIONS = [
-  {
-    id: "q1",
-    body: "確率変数 X が二項分布 B(10, 0.3) に従うとき、E(X) の値を求めよ。",
-    difficulty: 3,
-    choices: [
-      { id: "c1", label: "1", body: "2.1", isCorrect: false },
-      { id: "c2", label: "2", body: "3.0", isCorrect: true },
-      { id: "c3", label: "3", body: "3.3", isCorrect: false },
-      { id: "c4", label: "4", body: "7.0", isCorrect: false },
-    ],
-    explanation: "二項分布 B(n, p) の期待値は E(X) = np = 10 × 0.3 = 3.0",
-    fieldName: "データの分析",
-    subjectName: "数学I・A",
-  },
-  {
-    id: "q2",
-    body: "次の英文の空所に入れるのに最も適当なものを選べ。\n\nThe researcher found that the results were (    ) with the previous study.",
-    difficulty: 2,
-    choices: [
-      { id: "c5", label: "1", body: "consistent", isCorrect: true },
-      { id: "c6", label: "2", body: "considerate", isCorrect: false },
-      { id: "c7", label: "3", body: "considerable", isCorrect: false },
-      { id: "c8", label: "4", body: "conscious", isCorrect: false },
-    ],
-    explanation: "consistent with 〜 で「〜と一致した」という意味。be consistent with は頻出表現。",
-    fieldName: "第2問",
-    subjectName: "英語R",
-  },
-  {
-    id: "q3",
-    body: "質量 2.0kg の物体が水平面上で 3.0m/s² の加速度で運動している。物体に働く合力の大きさは何 N か。",
-    difficulty: 1,
-    choices: [
-      { id: "c9", label: "1", body: "1.5 N", isCorrect: false },
-      { id: "c10", label: "2", body: "5.0 N", isCorrect: false },
-      { id: "c11", label: "3", body: "6.0 N", isCorrect: true },
-      { id: "c12", label: "4", body: "9.8 N", isCorrect: false },
-    ],
-    explanation: "運動方程式 F = ma = 2.0 × 3.0 = 6.0 N",
-    fieldName: "力学",
-    subjectName: "物理",
-  },
-];
-
-type Phase = "question" | "result";
 type SelfRating = "perfect" | "good" | "unsure" | "forgot";
 
+interface Choice {
+  id: string;
+  label: string;
+  body: string;
+  is_correct: number;
+}
+
+interface Question {
+  id: string;
+  body: string;
+  difficulty: number;
+  explanation: string | null;
+  fieldName?: string;
+  subjectName?: string;
+  choices: Choice[];
+}
+
+const RATING_TO_QUALITY: Record<SelfRating, number> = {
+  perfect: 5,
+  good: 4,
+  unsure: 2,
+  forgot: 1,
+};
+
 export default function StudySessionPage() {
+  const params = useParams();
+  const router = useRouter();
+  const sessionId = params.sessionId as string;
+
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [phase, setPhase] = useState<Phase>("question");
+  const [phase, setPhase] = useState<"loading" | "question" | "result" | "finished">("loading");
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [results, setResults] = useState<{ correct: number; total: number }>({
     correct: 0,
     total: 0,
   });
 
-  const question = DEMO_QUESTIONS[currentIndex];
-  const totalQuestions = DEMO_QUESTIONS.length;
+  // セッションの問題一覧を取得
+  useEffect(() => {
+    async function loadSession() {
+      try {
+        // sessionId が "new-drill" の場合はドリルセッション開始
+        // それ以外は既存セッションの問題を取得
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "https://kyoutsu-api.miyata-d23.workers.dev"}/study-sessions/${sessionId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("kyoutsu_token")}`,
+            },
+          }
+        );
+
+        if (!res.ok) throw new Error("Session load failed");
+
+        const data = await res.json() as { session: Record<string, unknown>; questions?: Record<string, unknown>[] };
+
+        // セッションに紐づく問題を取得 (問題IDリストから選択肢も含めて取得)
+        if (data.questions && data.questions.length > 0) {
+          const loaded: Question[] = [];
+          for (const q of data.questions) {
+            try {
+              const detail = await apiGetQuestion(q.id as string);
+              loaded.push({
+                id: detail.question.id,
+                body: detail.question.body,
+                difficulty: detail.question.difficulty,
+                explanation: detail.question.explanation,
+                choices: detail.choices.map((c) => ({
+                  id: c.id,
+                  label: c.label,
+                  body: c.body,
+                  is_correct: c.is_correct,
+                })),
+              });
+            } catch {
+              // 個別問題の取得失敗は無視
+            }
+          }
+          setQuestions(loaded);
+          setPhase(loaded.length > 0 ? "question" : "finished");
+        } else {
+          setPhase("finished");
+        }
+      } catch (e) {
+        console.error("Session load error:", e);
+        setPhase("finished");
+      }
+    }
+    loadSession();
+  }, [sessionId]);
+
+  const question = questions[currentIndex];
+  const totalQuestions = questions.length;
 
   // タイマー
   useEffect(() => {
@@ -78,20 +123,50 @@ export default function StudySessionPage() {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   };
 
-  const handleAnswer = useCallback(() => {
-    if (!selectedChoiceId) return;
-    const correct = question.choices.find((c) => c.id === selectedChoiceId)?.isCorrect || false;
-    setIsCorrect(correct);
-    setResults((prev) => ({
-      correct: prev.correct + (correct ? 1 : 0),
-      total: prev.total + 1,
-    }));
-    setPhase("result");
-  }, [selectedChoiceId, question]);
+  const handleAnswer = useCallback(async () => {
+    if (!selectedChoiceId || !question) return;
 
-  const handleRating = (rating: SelfRating) => {
-    // TODO: SM-2レビュー記録をAPIに送信
-    console.log("Rating:", rating, "Question:", question.id);
+    try {
+      const result = await apiSubmitAnswer(sessionId, {
+        questionId: question.id,
+        chosenChoiceId: selectedChoiceId,
+        timeSpentMs: elapsedMs,
+      });
+
+      setIsCorrect(result.isCorrect);
+      setExplanation(result.explanation);
+      setResults((prev) => ({
+        correct: prev.correct + (result.isCorrect ? 1 : 0),
+        total: prev.total + 1,
+      }));
+      setPhase("result");
+    } catch (e) {
+      console.error("Submit answer error:", e);
+      // フォールバック: ローカル判定
+      const correct = question.choices.find((c) => c.id === selectedChoiceId)?.is_correct === 1;
+      setIsCorrect(correct);
+      setExplanation(question.explanation);
+      setResults((prev) => ({
+        correct: prev.correct + (correct ? 1 : 0),
+        total: prev.total + 1,
+      }));
+      setPhase("result");
+    }
+  }, [selectedChoiceId, question, sessionId, elapsedMs]);
+
+  const handleRating = async (rating: SelfRating) => {
+    if (!question) return;
+
+    // SM-2レビュー記録をAPIに送信
+    try {
+      await apiRecordReview({
+        questionId: question.id,
+        quality: RATING_TO_QUALITY[rating],
+      });
+    } catch (e) {
+      console.error("Review record error:", e);
+    }
+
     handleNext();
   };
 
@@ -99,20 +174,60 @@ export default function StudySessionPage() {
     if (currentIndex < totalQuestions - 1) {
       setCurrentIndex((i) => i + 1);
       setSelectedChoiceId(null);
+      setExplanation(null);
       setPhase("question");
+    } else {
+      // セッション終了
+      apiFinishSession(sessionId).catch(console.error);
+      setPhase("finished");
     }
   };
 
+  if (phase === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400 animate-pulse">問題を読み込み中...</div>
+      </div>
+    );
+  }
+
+  if (phase === "finished" || !question) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🎉</div>
+          <h2 className="text-xl font-bold mb-2">セッション完了</h2>
+          <p className="text-gray-400 mb-2">
+            {results.total > 0
+              ? `${results.correct}/${results.total} 正解 (${Math.round((results.correct / results.total) * 100)}%)`
+              : "問題がありませんでした"}
+          </p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            ダッシュボードに戻る
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const difficultyStars = "★".repeat(question.difficulty) + "☆".repeat(5 - question.difficulty);
+  const displayExplanation = explanation || question.explanation;
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-2xl mx-auto pb-24">
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm text-gray-400">
-          <span className="text-gray-300">{question.subjectName}</span>
-          <span className="mx-1">›</span>
-          <span>{question.fieldName}</span>
+          {question.subjectName && (
+            <>
+              <span className="text-gray-300">{question.subjectName}</span>
+              <span className="mx-1">›</span>
+            </>
+          )}
+          <span>{question.fieldName || `問題 ${currentIndex + 1}`}</span>
         </div>
         <div className="font-mono text-sm text-gray-400">{formatTime(elapsedMs)}</div>
       </div>
@@ -145,9 +260,9 @@ export default function StudySessionPage() {
           let choiceStyle = "border-gray-700 bg-gray-900 hover:border-gray-500";
 
           if (phase === "result") {
-            if (choice.isCorrect) {
+            if (choice.is_correct === 1) {
               choiceStyle = "border-green-500 bg-green-500/10";
-            } else if (choice.id === selectedChoiceId && !choice.isCorrect) {
+            } else if (choice.id === selectedChoiceId && choice.is_correct !== 1) {
               choiceStyle = "border-red-500 bg-red-500/10";
             } else {
               choiceStyle = "border-gray-800 bg-gray-900/50 opacity-50";
@@ -192,10 +307,12 @@ export default function StudySessionPage() {
           </div>
 
           {/* 解説 */}
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 mb-4">
-            <h3 className="text-sm font-bold text-gray-400 mb-2">解説</h3>
-            <p className="text-sm leading-relaxed">{question.explanation}</p>
-          </div>
+          {displayExplanation && (
+            <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 mb-4">
+              <h3 className="text-sm font-bold text-gray-400 mb-2">解説</h3>
+              <p className="text-sm leading-relaxed">{displayExplanation}</p>
+            </div>
+          )}
 
           {/* 理解度入力 (SM-2 quality) */}
           <div className="mb-4">

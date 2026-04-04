@@ -1,89 +1,159 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { SUBJECTS, TOTAL_MAX_SCORE } from "@kyoutsu/shared";
 import { SubjectHeatmap } from "@/components/charts/SubjectHeatmap";
 import { ScoreGauge } from "@/components/charts/ScoreGauge";
 import { ReviewAlert } from "@/components/dashboard/ReviewAlert";
 import { WeakPointList } from "@/components/dashboard/WeakPointList";
 import { TodayTasks } from "@/components/dashboard/TodayTasks";
+import { getAuthUser } from "@/lib/auth";
+import {
+  apiGetOverview,
+  apiGetDueCount,
+  apiGetTodayTasks,
+  apiStartSession,
+} from "@/lib/api";
 
-// デモデータ (後でAPI連携に置き換え)
-const DEMO_USER = {
-  displayName: "テストユーザー",
-  targetBunrui: "rika1" as const,
-  targetTotal: 780,
-  examDate: "2027-01-16",
-  currentTotal: 682,
-};
-
-const DEMO_FIELD_STATS = generateDemoFieldStats();
-
-function generateDemoFieldStats() {
-  // 実際はAPIから取得
-  return [
-    { fieldId: "kokugo_gendai", fieldName: "現代文", subjectId: "kokugo", total: 30, correct: 24, points: 110 },
-    { fieldId: "kokugo_kobun", fieldName: "古文", subjectId: "kokugo", total: 20, correct: 10, points: 50 },
-    { fieldId: "kokugo_kanbun", fieldName: "漢文", subjectId: "kokugo", total: 15, correct: 6, points: 40 },
-    { fieldId: "m1a_suushiki", fieldName: "数と式", subjectId: "math1a", total: 20, correct: 16, points: 15 },
-    { fieldId: "m1a_niji", fieldName: "2次関数", subjectId: "math1a", total: 18, correct: 13, points: 15 },
-    { fieldId: "m1a_zukei", fieldName: "図形計量", subjectId: "math1a", total: 15, correct: 9, points: 20 },
-    { fieldId: "m1a_data", fieldName: "データ", subjectId: "math1a", total: 12, correct: 10, points: 15 },
-    { fieldId: "m1a_jougo", fieldName: "確率", subjectId: "math1a", total: 25, correct: 12, points: 20 },
-    { fieldId: "m1a_seishitsu", fieldName: "図形性質", subjectId: "math1a", total: 10, correct: 7, points: 15 },
-    { fieldId: "m2bc_shiki", fieldName: "式と証明", subjectId: "math2bc", total: 15, correct: 10, points: 15 },
-    { fieldId: "m2bc_kansuu", fieldName: "三角指数", subjectId: "math2bc", total: 20, correct: 11, points: 20 },
-    { fieldId: "m2bc_bibun", fieldName: "微積分", subjectId: "math2bc", total: 22, correct: 13, points: 20 },
-    { fieldId: "m2bc_suuretsu", fieldName: "数列", subjectId: "math2bc", total: 18, correct: 14, points: 15 },
-    { fieldId: "m2bc_vector", fieldName: "ベクトル", subjectId: "math2bc", total: 16, correct: 8, points: 15 },
-    { fieldId: "m2bc_toukei", fieldName: "統計", subjectId: "math2bc", total: 10, correct: 7, points: 15 },
-    { fieldId: "engr_q1", fieldName: "第1問", subjectId: "eng_read", total: 15, correct: 13, points: 10 },
-    { fieldId: "engr_q2", fieldName: "第2問", subjectId: "eng_read", total: 15, correct: 12, points: 20 },
-    { fieldId: "engr_q3", fieldName: "第3問", subjectId: "eng_read", total: 12, correct: 9, points: 15 },
-    { fieldId: "engr_q4", fieldName: "第4問", subjectId: "eng_read", total: 14, correct: 8, points: 16 },
-    { fieldId: "engr_q5", fieldName: "第5問", subjectId: "eng_read", total: 10, correct: 5, points: 15 },
-    { fieldId: "engr_q6", fieldName: "第6問", subjectId: "eng_read", total: 12, correct: 6, points: 24 },
-    { fieldId: "engl_q1", fieldName: "第1問", subjectId: "eng_listen", total: 12, correct: 10, points: 25 },
-    { fieldId: "engl_q2", fieldName: "第2問", subjectId: "eng_listen", total: 12, correct: 9, points: 16 },
-    { fieldId: "engl_q3", fieldName: "第3問", subjectId: "eng_listen", total: 10, correct: 7, points: 18 },
-    { fieldId: "engl_q4", fieldName: "第4問", subjectId: "eng_listen", total: 10, correct: 6, points: 12 },
-    { fieldId: "engl_q5", fieldName: "第5問", subjectId: "eng_listen", total: 8, correct: 4, points: 15 },
-    { fieldId: "engl_q6", fieldName: "第6問", subjectId: "eng_listen", total: 8, correct: 5, points: 14 },
-    { fieldId: "phys_rikigaku", fieldName: "力学", subjectId: "physics", total: 25, correct: 18, points: 30 },
-    { fieldId: "phys_netsuri", fieldName: "熱力学", subjectId: "physics", total: 12, correct: 7, points: 15 },
-    { fieldId: "phys_hadou", fieldName: "波動", subjectId: "physics", total: 15, correct: 9, points: 20 },
-    { fieldId: "phys_denki", fieldName: "電磁気", subjectId: "physics", total: 20, correct: 10, points: 25 },
-    { fieldId: "phys_genshi", fieldName: "原子", subjectId: "physics", total: 8, correct: 5, points: 10 },
-    { fieldId: "chem_riron", fieldName: "理論化学", subjectId: "chemistry", total: 25, correct: 15, points: 35 },
-    { fieldId: "chem_muki", fieldName: "無機化学", subjectId: "chemistry", total: 15, correct: 11, points: 20 },
-    { fieldId: "chem_yuuki", fieldName: "有機化学", subjectId: "chemistry", total: 18, correct: 8, points: 30 },
-    { fieldId: "chem_koubun", fieldName: "高分子", subjectId: "chemistry", total: 10, correct: 6, points: 15 },
-    { fieldId: "soc_shizen", fieldName: "自然環境", subjectId: "social", total: 15, correct: 12, points: 20 },
-    { fieldId: "soc_shigen", fieldName: "資源産業", subjectId: "social", total: 12, correct: 9, points: 25 },
-    { fieldId: "soc_jinkou", fieldName: "人口都市", subjectId: "social", total: 10, correct: 6, points: 20 },
-    { fieldId: "soc_chiiki", fieldName: "生活文化", subjectId: "social", total: 12, correct: 8, points: 20 },
-    { fieldId: "soc_chizu", fieldName: "地図地域", subjectId: "social", total: 8, correct: 6, points: 15 },
-    { fieldId: "info_joho", fieldName: "情報社会", subjectId: "info1", total: 10, correct: 8, points: 15 },
-    { fieldId: "info_comm", fieldName: "情報デザイン", subjectId: "info1", total: 10, correct: 7, points: 20 },
-    { fieldId: "info_comp", fieldName: "プログラミング", subjectId: "info1", total: 15, correct: 10, points: 30 },
-    { fieldId: "info_network", fieldName: "ネットワーク", subjectId: "info1", total: 8, correct: 5, points: 15 },
-    { fieldId: "info_data", fieldName: "データ活用", subjectId: "info1", total: 10, correct: 7, points: 20 },
-  ];
+interface FieldStat {
+  fieldId: string;
+  fieldName: string;
+  subjectId: string;
+  total: number;
+  correct: number;
+  points: number;
 }
 
-function daysUntil(dateStr: string): number {
-  const target = new Date(dateStr);
+interface WeakPoint {
+  fieldName: string;
+  rate: number;
+  subjectName: string;
+  fieldId: string;
+}
+
+interface TodayTask {
+  subject: string;
+  task: string;
+  done: boolean;
+}
+
+function daysUntil(year: number): number {
+  // 共通テスト: 1月第3土曜日 (概算で1月18日)
+  const target = new Date(year, 0, 18);
   const now = new Date();
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export default function DashboardPage() {
-  const remainingDays = daysUntil(DEMO_USER.examDate);
+  const router = useRouter();
+  const authUser = getAuthUser();
 
-  const handleFieldClick = (fieldId: string, subjectId: string) => {
-    // TODO: 弱点ドリルへ遷移
-    console.log("Start drill:", fieldId, subjectId);
-  };
+  const [fieldStats, setFieldStats] = useState<FieldStat[]>([]);
+  const [currentTotal, setCurrentTotal] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [weakPoints, setWeakPoints] = useState<WeakPoint[]>([]);
+  const [todayTasks, setTodayTasks] = useState<TodayTask[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const targetTotal = authUser?.targetTotal || 780;
+  const examYear = authUser?.examYear || new Date().getFullYear() + 1;
+  const remainingDays = daysUntil(examYear);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [overview, dueCount, tasks] = await Promise.all([
+          apiGetOverview(),
+          apiGetDueCount(),
+          apiGetTodayTasks().catch(() => ({ tasks: [] as Record<string, unknown>[] })),
+        ]);
+
+        // フィールド統計をヒートマップ用に変換
+        const stats: FieldStat[] = overview.fieldStats.map((f) => ({
+          fieldId: f.field_id,
+          fieldName: f.field_name,
+          subjectId: f.subject_id,
+          total: f.total,
+          correct: f.correct,
+          points: f.points,
+        }));
+        setFieldStats(stats);
+
+        // 現在の推定合計点を計算
+        const subjectMap = new Map<string, { total: number; correct: number }>();
+        for (const s of overview.subjectStats) {
+          subjectMap.set(s.subject_id, { total: s.total, correct: s.correct });
+        }
+        let total = 0;
+        for (const subj of SUBJECTS) {
+          const s = subjectMap.get(subj.id);
+          if (s && s.total > 0) {
+            total += Math.round((s.correct / s.total) * subj.maxScore);
+          }
+        }
+        setCurrentTotal(total);
+
+        // 復習件数
+        setReviewCount(dueCount.count);
+
+        // 弱点抽出 (正答率の低い分野TOP5、最低5問以上回答)
+        const weak = stats
+          .filter((f) => f.total >= 5)
+          .map((f) => ({
+            fieldName: f.fieldName,
+            rate: f.total > 0 ? f.correct / f.total : 0,
+            subjectName: SUBJECTS.find((s) => s.id === f.subjectId)?.shortName || "",
+            fieldId: f.fieldId,
+          }))
+          .sort((a, b) => a.rate - b.rate)
+          .slice(0, 5);
+        setWeakPoints(weak);
+
+        // 今日のタスク
+        const subjectNameMap = Object.fromEntries(SUBJECTS.map((s) => [s.id, s.shortName]));
+        const taskTypeLabels: Record<string, string> = {
+          new_learn: "新規学習",
+          review: "復習",
+          weakness: "弱点ドリル",
+          exam: "模試演習",
+        };
+        const todayTaskList: TodayTask[] = (tasks.tasks as Record<string, unknown>[]).map((t) => ({
+          subject: subjectNameMap[t.subject_id as string] || String(t.subject_id),
+          task: `${taskTypeLabels[t.task_type as string] || t.task_type} ${t.target_question_count || 10}問`,
+          done: !!(t.completed_at),
+        }));
+        setTodayTasks(todayTaskList);
+      } catch (e) {
+        console.error("Dashboard load error:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const handleFieldClick = useCallback(async (fieldId: string, subjectId: string) => {
+    try {
+      const { sessionId } = await apiStartSession({
+        sessionType: "weakness",
+        subjectId,
+        fieldId,
+        questionCount: 10,
+      });
+      router.push(`/study/${sessionId}`);
+    } catch (e) {
+      console.error("Failed to start drill:", e);
+    }
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400 animate-pulse">読み込み中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
@@ -102,25 +172,27 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-400">
-          <span className="px-2 py-0.5 bg-gray-800 rounded text-xs">東大理一</span>
-          <span>目標: {DEMO_USER.targetTotal} / {TOTAL_MAX_SCORE}</span>
+          <span className="px-2 py-0.5 bg-gray-800 rounded text-xs">
+            {authUser?.targetBunrui === "rika1" ? "東大理一" : authUser?.targetBunrui || "東大理一"}
+          </span>
+          <span>目標: {targetTotal} / {TOTAL_MAX_SCORE}</span>
           <span className="font-mono font-bold text-lg text-white">
-            {DEMO_USER.currentTotal}
+            {currentTotal}
           </span>
           <span className="text-red-400">残り {remainingDays}日</span>
         </div>
 
         {/* プログレスバー */}
         <ScoreGauge
-          current={DEMO_USER.currentTotal}
-          target={DEMO_USER.targetTotal}
+          current={currentTotal}
+          target={targetTotal}
           max={TOTAL_MAX_SCORE}
         />
       </header>
 
       {/* メインヒートマップ */}
       <SubjectHeatmap
-        fieldStats={DEMO_FIELD_STATS}
+        fieldStats={fieldStats}
         onFieldClick={handleFieldClick}
       />
 
@@ -138,24 +210,15 @@ export default function DashboardPage() {
 
       {/* サブパネル */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <ReviewAlert count={23} />
+        <ReviewAlert count={reviewCount} />
         <WeakPointList
-          weakPoints={[
-            { fieldName: "漢文", rate: 0.40, subjectName: "国語" },
-            { fieldName: "有機化学", rate: 0.44, subjectName: "化学" },
-            { fieldName: "確率", rate: 0.48, subjectName: "数IA" },
-            { fieldName: "電磁気", rate: 0.50, subjectName: "物理" },
-            { fieldName: "ベクトル", rate: 0.50, subjectName: "数IIB" },
-          ]}
+          weakPoints={weakPoints}
+          onFieldClick={(fieldId) => {
+            const stat = fieldStats.find((f) => f.fieldId === fieldId);
+            if (stat) handleFieldClick(fieldId, stat.subjectId);
+          }}
         />
-        <TodayTasks
-          tasks={[
-            { subject: "物理", task: "電磁気 弱点ドリル 10問", done: false },
-            { subject: "化学", task: "有機化学 復習 8問", done: false },
-            { subject: "数IA", task: "確率 演習 10問", done: true },
-            { subject: "英語R", task: "第6問 長文演習", done: false },
-          ]}
-        />
+        <TodayTasks tasks={todayTasks} />
       </div>
 
       {/* ボトムナビ */}

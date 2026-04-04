@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "@/lib/auth";
 
-const API = "https://kyoutsu-api.miyata-d23.workers.dev";
+const API = process.env.NEXT_PUBLIC_API_URL || "https://kyoutsu-api.miyata-d23.workers.dev";
 
 interface Subject { id: string; name: string; max_score: number; display_order: number }
 interface Field { id: string; subject_id: string; name: string; display_order: number }
@@ -217,7 +217,10 @@ export default function AdminPage() {
 
 /** 問題管理タブ */
 function QuestionsTab({ tree, onRefresh }: { tree: ContentTree; onRefresh: () => void }) {
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<{
+    id: string; body: string; difficulty: number; points: number;
+    unit_name: string; field_name: string; subject_id: string;
+  }[]>([]);
   const [selectedField, setSelectedField] = useState("");
   const [qLoading, setQLoading] = useState(false);
 
@@ -226,7 +229,10 @@ function QuestionsTab({ tree, onRefresh }: { tree: ContentTree; onRefresh: () =>
     const token = getToken();
     const q = fieldId ? `?fieldId=${fieldId}` : "";
     const res = await fetch(`${API}/admin/questions${q}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { const data = await res.json(); setQuestions(data.questions); }
+    if (res.ok) {
+      const data = await res.json() as { questions: typeof questions };
+      setQuestions(data.questions);
+    }
     setQLoading(false);
   };
 
@@ -261,7 +267,7 @@ function QuestionsTab({ tree, onRefresh }: { tree: ContentTree; onRefresh: () =>
         </div>
       ) : (
         <div className="space-y-2">
-          {questions.map((q: any) => (
+          {questions.map((q) => (
             <div key={q.id} className="p-3 bg-gray-900 rounded-xl border border-gray-800">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">

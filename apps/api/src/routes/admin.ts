@@ -59,6 +59,29 @@ admin.put("/units/:id", async (c) => {
 
 admin.delete("/units/:id", async (c) => {
   const id = c.req.param("id");
+
+  // 先にこの単元に属する問題IDを取得
+  const qResult = await c.env.DB.prepare(
+    "SELECT id FROM questions WHERE unit_id = ?"
+  ).bind(id).all<{ id: string }>();
+  const qIds = qResult.results.map((q) => q.id);
+
+  // 問題に紐づくデータを削除
+  if (qIds.length > 0) {
+    for (let i = 0; i < qIds.length; i += 50) {
+      const chunk = qIds.slice(i, i + 50);
+      const placeholders = chunk.map(() => "?").join(",");
+      await c.env.DB.batch([
+        c.env.DB.prepare(`DELETE FROM answers WHERE question_id IN (${placeholders})`).bind(...chunk),
+        c.env.DB.prepare(`DELETE FROM review_schedules WHERE question_id IN (${placeholders})`).bind(...chunk),
+        c.env.DB.prepare(`DELETE FROM choices WHERE question_id IN (${placeholders})`).bind(...chunk),
+        c.env.DB.prepare(`DELETE FROM question_tags WHERE question_id IN (${placeholders})`).bind(...chunk),
+        c.env.DB.prepare(`DELETE FROM questions WHERE id IN (${placeholders})`).bind(...chunk),
+      ]);
+    }
+  }
+
+  // 単元自体と関連データを削除
   await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM chapters WHERE unit_id = ?").bind(id),
     c.env.DB.prepare("DELETE FROM unit_tags WHERE unit_id = ?").bind(id),
@@ -116,14 +139,14 @@ admin.get("/questions", async (c) => {
   const result = await c.env.DB.prepare(sql).bind(...params).all();
 
   // 各問題のタグも取得
-  const qIds = result.results.map((q: any) => q.id);
-  let questionTags: any[] = [];
+  const qIds = result.results.map((q) => (q as { id: string }).id);
+  let questionTags: { question_id: string; tag_id: string; label: string; color: string }[] = [];
   if (qIds.length > 0) {
     const tagResult = await c.env.DB.prepare(
       `SELECT qt.question_id, t.id as tag_id, t.label, t.color
        FROM question_tags qt JOIN trend_tags t ON qt.tag_id = t.id
        WHERE qt.question_id IN (${qIds.map(() => "?").join(",")})`)
-      .bind(...qIds).all();
+      .bind(...qIds).all<{ question_id: string; tag_id: string; label: string; color: string }>();
     questionTags = tagResult.results;
   }
 
@@ -140,7 +163,7 @@ admin.post("/questions", async (c) => {
   ).bind(qId, body.unitId, body.body, body.questionType, body.difficulty, body.points,
     body.explanation || null, body.source || null, body.year || null).run();
 
-  const batch: any[] = [];
+  const batch: ReturnType<ReturnType<typeof c.env.DB.prepare>["bind"]>[] = [];
   if (body.choices?.length) {
     const stmt = c.env.DB.prepare(
       "INSERT INTO choices (id, question_id, label, body, is_correct, display_order) VALUES (?, ?, ?, ?, ?, ?)"
@@ -171,10 +194,13 @@ admin.delete("/questions/:id", async (c) => {
 
 admin.get("/exam-history", async (c) => {
   const unitId = c.req.query("unitId");
+  const limit = Math.min(Number(c.req.query("limit") || 100), 500);
+  const offset = Number(c.req.query("offset") || 0);
   let sql = "SELECT eh.*, u.name as unit_name FROM exam_history eh JOIN units u ON eh.unit_id = u.id";
   const params: unknown[] = [];
   if (unitId) { sql += " WHERE eh.unit_id = ?"; params.push(unitId); }
-  sql += " ORDER BY eh.year DESC";
+  sql += " ORDER BY eh.year DESC LIMIT ? OFFSET ?";
+  params.push(limit, offset);
   const result = await c.env.DB.prepare(sql).bind(...params).all();
   return c.json({ history: result.results });
 });
@@ -257,8 +283,8 @@ admin.post("/predictions/calculate", async (c) => {
   const unitIds = unitsRes.results.map((u) => u.id);
   const predictions = calculateAllPredictions(
     unitIds,
-    historyRes.results as any,
-    unitTagsRes.results as any,
+    historyRes.results as { unit_id: string; year: number; points: number | null; difficulty: number | null }[],
+    unitTagsRes.results as { unit_id: string; tag_name: string }[],
     body.targetYear
   );
 

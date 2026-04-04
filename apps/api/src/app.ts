@@ -52,6 +52,7 @@ app.route("/setup", setup);
 
 // Admin routes (認証 + 管理者権限)
 app.use("/admin/*", authMiddleware);
+app.use("/admin/*", adminMiddleware);
 app.route("/admin", admin);
 
 export type AppType = typeof app;

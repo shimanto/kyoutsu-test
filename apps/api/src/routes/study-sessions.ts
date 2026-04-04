@@ -37,6 +37,12 @@ studySessions.post("/", async (c) => {
 
   const questions = await c.env.DB.prepare(sql).bind(...params).all();
 
+  if (questions.results.length === 0) {
+    // 空セッションをロールバック
+    await c.env.DB.prepare("DELETE FROM study_sessions WHERE id = ?").bind(sessionId).run();
+    return c.json({ error: "この分野には問題が登録されていません" }, 400);
+  }
+
   return c.json({ sessionId, questions: questions.results });
 });
 

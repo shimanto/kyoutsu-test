@@ -15,7 +15,7 @@ export const updateTargetsSchema = z.object({
   targets: z.array(
     z.object({
       subjectId: z.string().min(1),
-      targetScore: z.number().int().min(0),
+      targetScore: z.number().int().min(0).max(200),
     })
   ),
 });

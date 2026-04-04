@@ -25,8 +25,8 @@ cd apps/api && pnpm tsc --noEmit # API型チェック
 
 ## コアアルゴリズム
 - SM-2忘却曲線: `apps/api/src/services/spaced-repetition.ts`
-- 弱点検出: `apps/api/src/services/weakpoint-detector.ts` (TODO)
-- 学習計画生成: `apps/api/src/services/plan-generator.ts` (TODO)
+- 弱点検出: `apps/api/src/services/weakpoint-detector.ts`
+- 学習計画生成: `apps/api/src/services/plan-generator.ts`
 
 ## 対象科目 (9科目 合計900点)
 国語(200)・数学IA(100)・数学IIB/C(100)・英語R(100)・英語L(100)・物理(100)・化学(100)・社会(100)・情報I(100)

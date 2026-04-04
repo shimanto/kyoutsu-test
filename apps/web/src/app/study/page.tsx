@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { SUBJECTS } from "@kyoutsu/shared";
+import { apiGetDueCount } from "@/lib/api";
 
 const SUBJECT_GROUPS = [
   { label: "国語", subjects: SUBJECTS.filter((s) => s.id === "kokugo") },
@@ -12,6 +14,14 @@ const SUBJECT_GROUPS = [
 ];
 
 export default function StudySelectPage() {
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiGetDueCount()
+      .then((data) => setReviewCount(data.count))
+      .catch(() => setReviewCount(0));
+  }, []);
+
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-3xl mx-auto">
       <h1 className="text-xl font-bold mb-6">学習セッション</h1>
@@ -30,7 +40,9 @@ export default function StudySelectPage() {
                 忘却曲線に基づく今日の復習対象
               </p>
             </div>
-            <span className="text-2xl font-mono font-bold text-amber-400">23問</span>
+            <span className="text-2xl font-mono font-bold text-amber-400">
+              {reviewCount !== null ? `${reviewCount}問` : "..."}
+            </span>
           </div>
         </a>
 
