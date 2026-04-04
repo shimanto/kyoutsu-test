@@ -9,6 +9,7 @@ import { ShareButton } from "@/components/share/ShareButton";
 import { getAuthUser, logout } from "@/lib/auth";
 import { apiGetOverview, apiGetDueCount } from "@/lib/api";
 import { SAMPLE_FIELD_STATS } from "@/lib/sample-data";
+import { generateOverviewFromDeviation, deviationLabel } from "@/lib/deviation-generator";
 
 interface FieldStat {
   field_id: string;
@@ -74,12 +75,23 @@ function rateToTextColor(rate: number): string {
   return rate > 0.6 ? "#052e16" : "#ffffff";
 }
 
+const DEVIATION_STORAGE_KEY = "kyoutsu_deviation";
+
+function getSavedDeviation(): number {
+  if (typeof window === "undefined") return 60;
+  const saved = localStorage.getItem(DEVIATION_STORAGE_KEY);
+  return saved ? Number(saved) : 60;
+}
+
 export default function Home() {
   const router = useRouter();
   const authUser = getAuthUser();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [reviewCount, setReviewCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [deviation, setDeviation] = useState(getSavedDeviation);
+  const [showDeviationPanel, setShowDeviationPanel] = useState(false);
+  const [useApiData, setUseApiData] = useState(false);
 
   const remainingDays = daysUntil(authUser?.examYear || 2027);
   const targetTotal = authUser?.targetTotal || 780;
@@ -89,16 +101,25 @@ export default function Home() {
       apiGetOverview().catch(() => null),
       apiGetDueCount().catch(() => ({ count: 0 })),
     ]).then(([ov, rc]) => {
-      // APIデータが有効ならそれを使う、なければ常にサンプルデータでフォールバック
       if (ov && ov.fieldStats && ov.fieldStats.some((f: FieldStat) => f.total > 0)) {
         setOverview(ov);
+        setUseApiData(true);
       } else {
-        setOverview(buildFallbackOverview());
+        setOverview(generateOverviewFromDeviation(deviation));
       }
       setReviewCount(rc?.count || 0);
       setLoading(false);
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 偏差値変更時にヒートマップを再生成 */
+  const handleDeviationChange = (newDev: number) => {
+    setDeviation(newDev);
+    localStorage.setItem(DEVIATION_STORAGE_KEY, String(newDev));
+    if (!useApiData) {
+      setOverview(generateOverviewFromDeviation(newDev));
+    }
+  };
 
   const currentTotal = overview?.subjectStats.reduce((sum, s) => {
     const max = SUBJECT_MAX[s.subject_id] || 100;
@@ -226,11 +247,50 @@ export default function Home() {
                   <div key={i} className="w-3 h-2 rounded-sm" style={{backgroundColor:c}} />
                 ))}
               </div>
-              <button onClick={() => router.push("/onboarding")} className="text-[10px] text-gray-500 hover:text-gray-300">
-                偏差値変更
+              <button
+                onClick={() => setShowDeviationPanel((v) => !v)}
+                className="text-[10px] text-green-400 hover:text-green-300 font-medium"
+              >
+                偏差値 {deviation} {showDeviationPanel ? "▲" : "▼"}
               </button>
             </div>
           </div>
+
+          {/* 偏差値変更パネル */}
+          {showDeviationPanel && (
+            <div className="mb-3 p-3 bg-gray-900 border border-gray-800 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400">偏差値を変更</span>
+                <span className="text-xs text-gray-500">{deviationLabel(deviation)}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-gray-600 w-6">35</span>
+                <input
+                  type="range"
+                  min={35}
+                  max={80}
+                  value={deviation}
+                  onChange={(e) => handleDeviationChange(Number(e.target.value))}
+                  className="flex-1 h-2 bg-gray-800 rounded-full appearance-none cursor-pointer
+                             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5
+                             [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-green-500
+                             [&::-webkit-slider-thumb]:rounded-full"
+                />
+                <span className="text-[10px] text-gray-600 w-6">80</span>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-2xl font-mono font-bold text-green-400">{deviation}</span>
+                <span className="text-xs text-gray-500">
+                  推定得点 約{Math.round((0.58 + 0.35 * (2 / (1 + Math.exp(-1.5 * (deviation - 50) / 10)) - 1)) * 900)}/900
+                </span>
+              </div>
+              {useApiData && (
+                <p className="text-[10px] text-yellow-500 mt-2">
+                  APIデータが有効です。偏差値変更はAPIデータなし時に反映されます。
+                </p>
+              )}
+            </div>
+          )}
 
           {/* 6ブロック グリッド */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
