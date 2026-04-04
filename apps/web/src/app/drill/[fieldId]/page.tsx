@@ -259,11 +259,10 @@ function DrillSession({
   const [isCorrect, setIsCorrect] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [results, setResults] = useState<{ correct: number; total: number }>({ correct: 0, total: 0 });
-  // リトライ用: 不正解問題リストと正解問題の変形版を追跡
   const [activeQuestions, setActiveQuestions] = useState<SampleQuestion[]>(questions);
   const [retryRound, setRetryRound] = useState(0);
-  // 各問題の正解/不正解を記録
   const [questionResults, setQuestionResults] = useState<Map<string, boolean>>(new Map());
+  const [retryLoading, setRetryLoading] = useState(false);
 
   const question = activeQuestions[currentIndex];
   const totalQuestions = activeQuestions.length;
@@ -369,7 +368,9 @@ function DrillSession({
 
         <div className="flex gap-3 w-full max-w-sm">
           <button
+            disabled={retryLoading}
             onClick={async () => {
+              setRetryLoading(true);
               const nextRound = retryRound + 1;
               // 出題済み問題IDを収集
               const usedIds = new Set(activeQuestions.map((q) => q.id.replace(/_v\d+$/, "")));
@@ -440,12 +441,13 @@ function DrillSession({
               setSelectedChoiceId(null);
               setResults({ correct: 0, total: 0 });
               setQuestionResults(new Map());
+              setRetryLoading(false);
               setPhase("question");
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            className="flex-1 py-3 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm"
+            className="flex-1 py-3 border border-gray-700 rounded-lg hover:bg-gray-900 disabled:opacity-50 transition-colors text-sm"
           >
-            もう一度 {retryRound > 0 && <span className="text-[10px] text-gray-500 ml-1">({retryRound + 1}回目)</span>}
+            {retryLoading ? "問題を準備中..." : <>もう一度 {retryRound > 0 && <span className="text-[10px] text-gray-500 ml-1">({retryRound + 1}回目)</span>}</>}
           </button>
           <button
             onClick={onBack}
