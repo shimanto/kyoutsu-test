@@ -68,14 +68,16 @@ export function isInLiffClient(): boolean {
  */
 export function liffLogin(): void {
   if (!initialized) {
-    // LIFF未初期化の場合はLIFF URLに直接遷移してログイン
     window.location.href = `https://liff.line.me/${LIFF_ID}`;
     return;
   }
 
-  if (!liff.isLoggedIn()) {
-    liff.login({ redirectUri: window.location.origin + "/login" });
+  // 既にログイン済みでもIDトークンが期限切れの可能性がある
+  // 一度ログアウトしてから再ログインすることでフレッシュなトークンを取得
+  if (liff.isLoggedIn()) {
+    liff.logout();
   }
+  liff.login({ redirectUri: window.location.origin + "/login" });
 }
 
 /**

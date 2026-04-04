@@ -103,7 +103,13 @@ export default function LoginPage() {
         router.replace("/");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "LINEログインに失敗しました");
+      const msg = e instanceof Error ? e.message : "LINEログインに失敗しました";
+      // IDトークン期限切れの場合は自動で再ログイン
+      if (msg.includes("expired") || msg.includes("invalid")) {
+        liffLogin(); // logout→再login でフレッシュなトークンを取得
+        return;
+      }
+      setError(msg);
       setLineLoading(false);
       loginFlowInProgress.current = false;
     }

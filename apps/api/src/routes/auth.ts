@@ -50,7 +50,8 @@ auth.post("/line-login", async (c) => {
   });
 
   if (!verifyRes.ok) {
-    return c.json({ error: "LINE token verification failed" }, 401);
+    const errBody = await verifyRes.text().catch(() => "unknown");
+    return c.json({ error: `LINE token verification failed: ${errBody}` }, 401);
   }
 
   const lineProfile = (await verifyRes.json()) as {

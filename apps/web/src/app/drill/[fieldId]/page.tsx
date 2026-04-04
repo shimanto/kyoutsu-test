@@ -9,6 +9,7 @@ import {
   type SampleQuestion,
 } from "@/lib/sample-data";
 import { getFieldQuestions } from "@/lib/question-generator";
+import { apiGenerateAiQuestion, apiGenerateVariantQuestion } from "@/lib/api";
 
 
 type Phase = "question" | "result" | "complete";
@@ -57,6 +58,7 @@ export default function DrillPage() {
 
   return <DrillSession
     questions={questions}
+    fieldId={fieldId}
     fieldName={fieldName}
     subjectName={subjectName}
     currentRate={currentRate}
@@ -65,10 +67,186 @@ export default function DrillPage() {
   />;
 }
 
+/**
+ * 問題が変形可能かどうかを判定する
+ * 数値計算・公式適用系は不正解選択肢を正解にできないため変形不可
+ */
+function canCreateVariant(q: SampleQuestion): boolean {
+  const body = q.body;
+  // 計算結果を問う問題（「求めよ」「何〜か」「値は」等）
+  if (/求めよ|を求め|何\s*[m秒Ω℃%kg]|の値は|いくらか|何度か|何\s*mol|何\s*[JNW]/.test(body)) return false;
+  // プログラム出力系
+  if (/出力結果|print|output/.test(body)) return false;
+  // 明確な数値が正解の場合
+  const correctBody = q.choices.find((c) => c.isCorrect)?.body || "";
+  if (/^[\d.√π×÷+\-/()%\s]+$/.test(correctBody.replace(/[a-zA-Z]/g, ""))) return false;
+  return true;
+}
+
+/**
+ * 正解だった問題を別の選択肢が正解の変形問題に書き換える。
+ * 同期で対応できるパターン:
+ *   1. 「正しいもの」⇔「誤っているもの」の反転
+ *   2. 問題文中に元の正解テキストが含まれる場合、新しい正解テキストで置換
+ * それ以外は null を返し、AI生成にフォールバックする。
+ */
+function createVariantSync(q: SampleQuestion, retryCount: number): SampleQuestion | null {
+  if (!canCreateVariant(q)) return null;
+
+  const wrongChoices = q.choices.filter((c) => !c.isCorrect);
+  if (wrongChoices.length === 0) return null;
+
+  const newCorrect = wrongChoices[retryCount % wrongChoices.length];
+  const oldCorrect = q.choices.find((c) => c.isCorrect)!;
+
+  const newChoices = q.choices.map((c) => {
+    if (c.id === newCorrect.id) return { ...c, isCorrect: true };
+    if (c.id === oldCorrect.id) return { ...c, isCorrect: false };
+    return { ...c };
+  });
+
+  let newBody: string | null = null;
+
+  // パターン1: 「正しいもの」⇔「誤っているもの」の反転
+  if (q.body.includes("正しいもの")) {
+    newBody = q.body.replace("正しいもの", "誤っているもの");
+  } else if (q.body.includes("誤っているもの") || q.body.includes("適切でないもの")) {
+    newBody = q.body.replace(/誤っているもの|適切でないもの/, "正しいもの");
+  }
+
+  // パターン2: 解説文から選択肢に対応するキーワードを抽出して設問文を書き換える
+  // 例: 解説に「Af = 熱帯雨林気候」「Cs = 地中海性気候」等のマッピングがある場合
+  if (!newBody) {
+    const keywordMap = extractKeywordMapping(q.explanation, q.choices);
+    const oldKeyword = keywordMap.get(oldCorrect.body);
+    const newKeyword = keywordMap.get(newCorrect.body);
+    if (oldKeyword && newKeyword && q.body.includes(oldKeyword)) {
+      newBody = q.body.replace(oldKeyword, newKeyword);
+    }
+  }
+
+  // パターン3: 問題文中に元の正解テキストがそのまま含まれている場合は直接置換
+  if (!newBody && q.body.includes(oldCorrect.body)) {
+    newBody = q.body.replace(oldCorrect.body, newCorrect.body);
+  }
+
+  if (!newBody) return null; // AI生成が必要
+
+  return {
+    ...q,
+    id: `${q.id}_v${retryCount}`,
+    body: newBody,
+    choices: newChoices,
+    explanation: `【変形問題の解説】正解は「${newCorrect.body}」。元の問題では「${oldCorrect.body}」が正解でした。\n\n${q.explanation}`,
+  };
+}
+
+/**
+ * 解説文から「キーワード = 選択肢テキスト」のマッピングを抽出する。
+ * 例: 「Af = 熱帯雨林気候」→ Map { "熱帯雨林気候" => "Af" }
+ * 例: 「Awがサバナ気候」→ Map { "サバナ気候" => "Aw" }
+ */
+function extractKeywordMapping(
+  explanation: string,
+  choices: SampleQuestion["choices"],
+): Map<string, string> {
+  const mapping = new Map<string, string>();
+
+  for (const choice of choices) {
+    // 「X = 選択肢」「X＝選択肢」パターン
+    const eqPattern = new RegExp(`([A-Za-z][A-Za-z0-9/]*(?:\\s*[A-Za-z0-9/]+)?)\\s*[=＝]\\s*${escapeRegex(choice.body)}`);
+    const eqMatch = explanation.match(eqPattern);
+    if (eqMatch) {
+      mapping.set(choice.body, eqMatch[1].trim());
+      continue;
+    }
+
+    // 「Xが選択肢」「Xは選択肢」パターン
+    const gaPattern = new RegExp(`([A-Za-z][A-Za-z0-9/]*(?:\\s*[A-Za-z0-9/]+)?)\\s*[がはの]\\s*${escapeRegex(choice.body)}`);
+    const gaMatch = explanation.match(gaPattern);
+    if (gaMatch) {
+      mapping.set(choice.body, gaMatch[1].trim());
+      continue;
+    }
+
+    // 「選択肢はX」「選択肢＝X」パターン（逆順）
+    const revPattern = new RegExp(`${escapeRegex(choice.body)}\\s*[はが=＝]\\s*([A-Za-z][A-Za-z0-9/]*(?:\\s*[A-Za-z0-9/]+)?)`);
+    const revMatch = explanation.match(revPattern);
+    if (revMatch) {
+      mapping.set(choice.body, revMatch[1].trim());
+    }
+  }
+
+  return mapping;
+}
+
+/**
+ * AI応答の変形問題文が有効かチェックする。
+ * メタ的な表現や元の問題文がそのまま残っている場合は無効。
+ */
+function isValidVariantBody(newBody: string, originalBody: string): boolean {
+  // メタ的な表現が含まれていたら無効
+  if (/変形|解き直し|正解となる|次のうち.*が正解/.test(newBody)) return false;
+  // 元の問題文がそのまま含まれていたら無効（改行で連結されただけ）
+  if (newBody.includes(originalBody)) return false;
+  // 空や短すぎる場合は無効
+  if (newBody.trim().length < 5) return false;
+  return true;
+}
+
+/**
+ * AIを使って変形問題を生成する。
+ * 問題文を書き換えて、指定した選択肢が正解になるようにする。
+ */
+async function createVariantWithAI(
+  q: SampleQuestion,
+  retryCount: number,
+  subjectName: string,
+  fieldName: string,
+): Promise<SampleQuestion | null> {
+  const wrongChoices = q.choices.filter((c) => !c.isCorrect);
+  if (wrongChoices.length === 0) return null;
+
+  const newCorrect = wrongChoices[retryCount % wrongChoices.length];
+  const oldCorrect = q.choices.find((c) => c.isCorrect)!;
+
+  try {
+    const res = await apiGenerateVariantQuestion({
+      originalBody: q.body,
+      choices: q.choices.map((c) => ({ label: c.label, body: c.body, isCorrect: c.isCorrect })),
+      newCorrectBody: newCorrect.body,
+      subjectName,
+      fieldName,
+    });
+
+    // AI応答のバリデーション
+    if (!res.body || !isValidVariantBody(res.body, q.body)) {
+      return null;
+    }
+
+    const newChoices = q.choices.map((c) => {
+      if (c.id === newCorrect.id) return { ...c, isCorrect: true };
+      if (c.id === oldCorrect.id) return { ...c, isCorrect: false };
+      return { ...c };
+    });
+
+    return {
+      ...q,
+      id: `${q.id}_v${retryCount}`,
+      body: res.body,
+      choices: newChoices,
+      explanation: res.explanation || `【変形問題の解説】正解は「${newCorrect.body}」。元の問題では「${oldCorrect.body}」が正解でした。\n\n${q.explanation}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function DrillSession({
-  questions, fieldName, subjectName, currentRate, fieldStat, onBack,
+  questions, fieldId, fieldName, subjectName, currentRate, fieldStat, onBack,
 }: {
   questions: SampleQuestion[];
+  fieldId: string;
   fieldName: string;
   subjectName: string;
   currentRate: number;
@@ -81,9 +259,14 @@ function DrillSession({
   const [isCorrect, setIsCorrect] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [results, setResults] = useState<{ correct: number; total: number }>({ correct: 0, total: 0 });
+  // リトライ用: 不正解問題リストと正解問題の変形版を追跡
+  const [activeQuestions, setActiveQuestions] = useState<SampleQuestion[]>(questions);
+  const [retryRound, setRetryRound] = useState(0);
+  // 各問題の正解/不正解を記録
+  const [questionResults, setQuestionResults] = useState<Map<string, boolean>>(new Map());
 
-  const question = questions[currentIndex];
-  const totalQuestions = questions.length;
+  const question = activeQuestions[currentIndex];
+  const totalQuestions = activeQuestions.length;
 
   // タイマー
   useEffect(() => {
@@ -106,8 +289,9 @@ function DrillSession({
       correct: prev.correct + (correct ? 1 : 0),
       total: prev.total + 1,
     }));
+    // 問題ごとの正解/不正解を記録
+    setQuestionResults((prev) => new Map(prev).set(question.id, correct));
     setPhase("result");
-    // 解説・理解度ボタンが見えるよう自動スクロール
     requestAnimationFrame(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     });
@@ -169,17 +353,99 @@ function DrillSession({
           </div>
         </div>
 
+        {/* 不正解数カウント */}
+        {(() => {
+          const wrongCount = Array.from(questionResults.values()).filter((v) => !v).length;
+          const correctCount = Array.from(questionResults.values()).filter((v) => v).length;
+          return wrongCount > 0 ? (
+            <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 w-full max-w-sm text-center">
+              <p className="text-xs text-gray-400">
+                「もう一度」で: 不正解 <span className="text-red-400 font-bold">{wrongCount}</span> 問はそのまま再出題、
+                正解 <span className="text-blue-400 font-bold">{correctCount}</span> 問は変形問題で再出題
+              </p>
+            </div>
+          ) : null;
+        })()}
+
         <div className="flex gap-3 w-full max-w-sm">
           <button
-            onClick={() => {
+            onClick={async () => {
+              const nextRound = retryRound + 1;
+              // 出題済み問題IDを収集
+              const usedIds = new Set(activeQuestions.map((q) => q.id.replace(/_v\d+$/, "")));
+              // 全問プールから未使用問題を取得
+              const allPool = getFieldQuestions(fieldId, SAMPLE_QUESTIONS_BY_FIELD[fieldId] || []);
+              const unusedPool = allPool.filter((q) => !usedIds.has(q.id));
+
+              const retryList: SampleQuestion[] = [];
+              const aiPending: Promise<SampleQuestion | null>[] = [];
+
+              for (const q of activeQuestions) {
+                const wasCorrect = questionResults.get(q.id);
+                if (wasCorrect === false) {
+                  retryList.push(q);
+                } else if (wasCorrect === true) {
+                  // 正解 → 同期変形（正しいもの⇔誤っているもの反転）を試す
+                  const syncVariant = createVariantSync(q, nextRound);
+                  if (syncVariant) {
+                    retryList.push(syncVariant);
+                  } else if (canCreateVariant(q)) {
+                    // 問題文の書き換えが必要 → AI変形生成
+                    const idx = retryList.length;
+                    retryList.push(q); // プレースホルダー
+                    aiPending.push(
+                      createVariantWithAI(q, nextRound, subjectName, fieldName)
+                        .then((v) => v ? { ...v, _idx: idx } as SampleQuestion & { _idx: number } : null)
+                        .catch(() => null)
+                    );
+                  } else if (unusedPool.length > 0) {
+                    // 変形不可（計算系等）→ 未使用問題から代替
+                    const alt = unusedPool.shift()!;
+                    usedIds.add(alt.id);
+                    retryList.push(alt);
+                  } else {
+                    // 最終手段: AI新問題生成
+                    const idx = retryList.length;
+                    retryList.push(q);
+                    aiPending.push(
+                      apiGenerateAiQuestion({
+                        fieldName: fieldName,
+                        subjectName: subjectName,
+                        difficulty: q.difficulty,
+                        excludeBody: q.body,
+                      }).then((res) => ({ ...res.question, _idx: idx } as SampleQuestion & { _idx: number }))
+                        .catch(() => null)
+                    );
+                  }
+                } else {
+                  retryList.push(q);
+                }
+              }
+
+              // AI生成結果を反映
+              if (aiPending.length > 0) {
+                const aiResults = await Promise.all(aiPending);
+                for (const r of aiResults) {
+                  if (r && "_idx" in r) {
+                    const idx = (r as unknown as { _idx: number })._idx;
+                    const { _idx, ...question } = r as SampleQuestion & { _idx: number };
+                    retryList[idx] = question;
+                  }
+                }
+              }
+
+              setActiveQuestions(retryList);
+              setRetryRound(nextRound);
               setCurrentIndex(0);
               setSelectedChoiceId(null);
               setResults({ correct: 0, total: 0 });
+              setQuestionResults(new Map());
               setPhase("question");
+              window.scrollTo({ top: 0, behavior: "smooth" });
             }}
             className="flex-1 py-3 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors text-sm"
           >
-            もう一度
+            もう一度 {retryRound > 0 && <span className="text-[10px] text-gray-500 ml-1">({retryRound + 1}回目)</span>}
           </button>
           <button
             onClick={onBack}
@@ -295,7 +561,42 @@ function DrillSession({
 
           <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 mb-4">
             <h3 className="text-sm font-bold text-gray-400 mb-2">解説</h3>
-            <p className="text-sm leading-relaxed">{question.explanation}</p>
+            <p className="text-sm leading-relaxed">
+              <HighlightedExplanation text={question.explanation} choices={question.choices} />
+            </p>
+
+            {/* 各選択肢の個別解説 */}
+            <div className="mt-4 pt-3 border-t border-gray-800 space-y-2">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">選択肢の詳細</p>
+              {question.choices.map((c) => {
+                const wasSelected = c.id === selectedChoiceId;
+                return (
+                  <div key={c.id} className={`flex gap-2 text-xs rounded-lg px-3 py-2 ${
+                    c.isCorrect ? "bg-blue-900/20 border border-blue-800/30" : "bg-gray-800/50"
+                  }`}>
+                    <span className={`font-bold shrink-0 ${c.isCorrect ? "text-blue-400" : "text-red-400"}`}>
+                      {c.label}. {c.isCorrect ? "○" : "×"}
+                    </span>
+                    <div>
+                      <span className={`font-medium ${c.isCorrect ? "text-blue-300" : "text-red-300"}`}>
+                        {c.body}
+                      </span>
+                      {wasSelected && !c.isCorrect && (
+                        <span className="ml-1 text-[10px] text-red-500">← あなたの回答</span>
+                      )}
+                      {c.isCorrect && (
+                        <span className="ml-1 text-[10px] text-blue-500">← 正解</span>
+                      )}
+                      <p className="text-gray-400 mt-0.5">
+                        {c.isCorrect
+                          ? "正解。" + getCorrectReason(question.explanation, c.body)
+                          : getWrongReason(c.body, question.choices.find((x) => x.isCorrect)?.body || "", question.explanation)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mb-4">
@@ -367,4 +668,63 @@ function estimateNewRate(
   const newTotal = fieldStat.total + results.total;
   const newCorrect = fieldStat.correct + results.correct;
   return Math.round((newCorrect / newTotal) * 100);
+}
+
+/** 解説テキスト中の選択肢テキストをハイライト表示 */
+function HighlightedExplanation({ text, choices }: {
+  text: string;
+  choices: SampleQuestion["choices"];
+}) {
+  // 正解と不正解の選択肢テキストを長い順にソート（部分一致の誤検出を防ぐ）
+  const correctBodies = choices.filter((c) => c.isCorrect).map((c) => c.body);
+  const wrongBodies = choices.filter((c) => !c.isCorrect).map((c) => c.body);
+  const allBodies = [...correctBodies, ...wrongBodies].sort((a, b) => b.length - a.length);
+
+  // 短すぎるテキスト（1文字以下）はハイライト対象外
+  const targets = allBodies.filter((b) => b.length > 1);
+  if (targets.length === 0) return <>{text}</>;
+
+  // テキストを分割してハイライト
+  const pattern = new RegExp(`(${targets.map(escapeRegex).join("|")})`, "g");
+  const parts = text.split(pattern);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (correctBodies.includes(part)) {
+          return <span key={i} className="text-blue-400 font-bold">{part}</span>;
+        }
+        if (wrongBodies.includes(part)) {
+          return <span key={i} className="text-red-400">{part}</span>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** 正解の補足理由を解説テキストから抽出 */
+function getCorrectReason(explanation: string, correctBody: string): string {
+  // 解説中に正解テキストが含まれる文を探す
+  const sentences = explanation.split(/[。．\n]/).filter(Boolean);
+  const match = sentences.find((s) => s.includes(correctBody));
+  if (match && match.length > correctBody.length + 5) {
+    return match.replace(correctBody, "").trim().replace(/^[、。が]/,"");
+  }
+  return "";
+}
+
+/** 不正解の補足理由を生成 */
+function getWrongReason(wrongBody: string, correctBody: string, explanation: string): string {
+  // 解説中に不正解テキストの言及があるか探す
+  const sentences = explanation.split(/[。．\n]/).filter(Boolean);
+  const match = sentences.find((s) => s.includes(wrongBody));
+  if (match) {
+    return match.trim() + "。";
+  }
+  return `この選択肢は不正解。正解は「${correctBody}」。`;
 }

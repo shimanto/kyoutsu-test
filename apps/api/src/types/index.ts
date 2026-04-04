@@ -1,6 +1,7 @@
 export interface Env {
   Bindings: {
     DB: D1Database;
+    AI: Ai;
     JWT_SECRET: string;
     LINE_CHANNEL_ID: string;
     LINE_CHANNEL_SECRET: string;

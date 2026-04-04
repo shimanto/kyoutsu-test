@@ -37,18 +37,29 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-// ─── Auth ───
+// ─── Auth (401でリダイレクトしない) ───
+async function authFetch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error || `ログインに失敗しました (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export async function apiDemoLogin(displayName: string) {
-  return apiFetch<{ token: string; userId: string; displayName: string }>(
-    "/auth/demo-login",
-    { method: "POST", body: JSON.stringify({ displayName }) }
+  return authFetch<{ token: string; userId: string; displayName: string }>(
+    "/auth/demo-login", { displayName }
   );
 }
 
 export async function apiLineLogin(idToken: string) {
-  return apiFetch<{ token: string; userId: string }>(
-    "/auth/line-login",
-    { method: "POST", body: JSON.stringify({ idToken }) }
+  return authFetch<{ token: string; userId: string }>(
+    "/auth/line-login", { idToken }
   );
 }
 
@@ -210,4 +221,31 @@ export async function apiGetQuestion(id: string) {
     question: { id: string; body: string; difficulty: number; explanation: string };
     choices: { id: string; label: string; body: string; is_correct: number; display_order: number }[];
   }>(`/questions/${id}`);
+}
+
+// ─── AI Questions ───
+export async function apiGenerateAiQuestion(data: {
+  fieldName: string; subjectName: string; difficulty?: number; excludeBody?: string;
+}) {
+  return apiFetch<{
+    question: {
+      id: string; body: string; difficulty: number;
+      choices: { id: string; label: string; body: string; isCorrect: boolean }[];
+      explanation: string;
+    };
+  }>("/ai-questions/generate", { method: "POST", body: JSON.stringify(data) });
+}
+
+/** 変形問題生成: 選択肢はそのままで問題文を書き換え、別の選択肢が正解になるようにする */
+export async function apiGenerateVariantQuestion(data: {
+  originalBody: string;
+  choices: { label: string; body: string; isCorrect: boolean }[];
+  newCorrectBody: string;
+  subjectName: string;
+  fieldName: string;
+}) {
+  return apiFetch<{
+    body: string;
+    explanation: string;
+  }>("/ai-questions/generate-variant", { method: "POST", body: JSON.stringify(data) });
 }

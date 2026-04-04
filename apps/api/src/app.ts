@@ -14,6 +14,7 @@ import analytics from "./routes/analytics";
 import admin from "./routes/admin";
 import plans from "./routes/plans";
 import setup from "./routes/setup";
+import aiQuestions from "./routes/ai-questions";
 import { adminMiddleware } from "./middleware/auth";
 
 const app = new Hono<Env>();
@@ -49,6 +50,9 @@ app.route("/plans", plans);
 
 app.use("/setup/*", authMiddleware);
 app.route("/setup", setup);
+
+app.use("/ai-questions/*", authMiddleware);
+app.route("/ai-questions", aiQuestions);
 
 // Admin routes (認証 + 管理者権限)
 app.use("/admin/*", authMiddleware);
