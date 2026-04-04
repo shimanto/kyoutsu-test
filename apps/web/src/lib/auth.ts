@@ -48,5 +48,13 @@ export function isLoggedIn(): boolean {
 export function logout(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_CACHE_KEY);
+  // LIFF ログアウトフラグを立てて、ログインページでの自動再ログインを防止
+  sessionStorage.setItem("kyoutsu_just_logged_out", "1");
+  sessionStorage.removeItem("kyoutsu_auto_login_attempted");
+  // LIFF SDKのセッションもクリア
+  try {
+    const liff = (window as unknown as { liff?: { isLoggedIn: () => boolean; logout: () => void } }).liff;
+    if (liff?.isLoggedIn?.()) liff.logout();
+  } catch { /* LIFF未読込の場合は無視 */ }
   window.location.href = "/login";
 }

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn, setToken, setAuthUser } from "@/lib/auth";
 import { apiDemoLogin, apiLineLogin, apiGetMe } from "@/lib/api";
 import { isLiffConfigured, initLiff, isLiffLoggedIn, liffLogin, getLiffIdToken } from "@/lib/liff";
 import { LogoMark } from "@/components/brand/LogoMark";
+
+const AUTO_LOGIN_ATTEMPTED_KEY = "kyoutsu_auto_login_attempted";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,10 +18,28 @@ export default function LoginPage() {
   const [liffReady, setLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
   const liffConfigured = isLiffConfigured();
+  const loginFlowInProgress = useRef(false);
 
   useEffect(() => {
     if (isLoggedIn()) {
       router.replace("/");
+      return;
+    }
+
+    // ログアウト直後かチェック（自動再ログイン防止）
+    const justLoggedOut = sessionStorage.getItem("kyoutsu_just_logged_out");
+    if (justLoggedOut) {
+      sessionStorage.removeItem("kyoutsu_just_logged_out");
+      sessionStorage.removeItem(AUTO_LOGIN_ATTEMPTED_KEY);
+      // LIFF初期化はするが自動ログインはしない
+      if (liffConfigured) {
+        initLiff()
+          .then(() => setLiffReady(true))
+          .catch((err) => {
+            console.error("LIFF init failed:", err);
+            setLiffError(err instanceof Error ? err.message : "LIFF初期化エラー");
+          });
+      }
       return;
     }
 
@@ -29,7 +49,9 @@ export default function LoginPage() {
         .then(() => {
           setLiffReady(true);
           // LIFF初期化後、既にLINEログイン済みなら自動でアプリログイン
-          if (isLiffLoggedIn()) {
+          // ただし既に自動ログインを試行済みならスキップ（ループ防止）
+          if (isLiffLoggedIn() && !sessionStorage.getItem(AUTO_LOGIN_ATTEMPTED_KEY)) {
+            sessionStorage.setItem(AUTO_LOGIN_ATTEMPTED_KEY, "1");
             handleLineLoginFlow();
           }
         })
@@ -42,6 +64,10 @@ export default function LoginPage() {
 
   /** LINE IDトークン → API → JWT → ログイン完了 */
   const handleLineLoginFlow = useCallback(async () => {
+    // 既にフロー実行中なら二重実行を防止
+    if (loginFlowInProgress.current) return;
+    loginFlowInProgress.current = true;
+
     setLineLoading(true);
     setError(null);
 
@@ -67,6 +93,9 @@ export default function LoginPage() {
         loginMethod: "line",
       });
 
+      // ログイン成功 → 自動ログイン試行フラグをクリア
+      sessionStorage.removeItem(AUTO_LOGIN_ATTEMPTED_KEY);
+
       // 新規ユーザーはオンボーディングへ、既存ユーザーはホームへ
       if (!user.target_bunrui) {
         router.replace("/onboarding");
@@ -76,16 +105,21 @@ export default function LoginPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "LINEログインに失敗しました");
       setLineLoading(false);
+      loginFlowInProgress.current = false;
     }
   }, [router]);
 
   /** LINEログインボタン押下 */
   const handleLineLogin = useCallback(() => {
+    // 手動クリック時はフラグをリセットしてリトライ可能に
+    loginFlowInProgress.current = false;
+
     if (liffReady && isLiffLoggedIn()) {
       // 既にLINEログイン済み → IDトークン取得してAPI認証
       handleLineLoginFlow();
     } else {
       // LINE認証画面にリダイレクト (LIFF未初期化でもliffLogin内でフォールバック)
+      sessionStorage.removeItem(AUTO_LOGIN_ATTEMPTED_KEY);
       liffLogin();
     }
   }, [liffReady, handleLineLoginFlow]);
