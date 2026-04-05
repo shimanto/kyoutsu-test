@@ -17,6 +17,7 @@ import setup from "./routes/setup";
 import aiQuestions from "./routes/ai-questions";
 import feedback from "./routes/feedback";
 import growth from "./routes/growth";
+import webhook from "./routes/webhook";
 import { adminMiddleware } from "./middleware/auth";
 
 const app = new Hono<Env>();
@@ -31,6 +32,7 @@ app.get("/", (c) => c.json({ status: "ok", service: "kyoutsu-api" }));
 
 // Public routes
 app.route("/auth", auth);
+app.route("/webhook", webhook);
 
 // Protected routes
 app.use("/users/*", authMiddleware);

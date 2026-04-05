@@ -4,6 +4,7 @@ import { loginSchema } from "@kyoutsu/shared";
 import { z } from "zod";
 import type { Env } from "../types";
 import { generateId } from "../lib/ulid";
+import { notifyAdminLogin } from "../lib/line-notify";
 
 const auth = new Hono<Env>();
 
@@ -89,11 +90,24 @@ auth.post("/line-login", async (c) => {
       .run();
   }
 
+  const isNewUser = !existing;
+
   const secret = new TextEncoder().encode(c.env.JWT_SECRET);
   const token = await new SignJWT({ sub: userId, role })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("30d")
     .sign(secret);
+
+  // 管理者にLINEログイン通知（非同期・ノンブロッキング）
+  c.executionCtx.waitUntil(
+    notifyAdminLogin({
+      db: c.env.DB,
+      token: c.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN,
+      displayName: lineProfile.name,
+      lineUserId: lineProfile.sub,
+      isNewUser,
+    })
+  );
 
   return c.json({ token, userId });
 });
