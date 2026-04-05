@@ -20,6 +20,67 @@ export default function LoginPage() {
   const liffConfigured = isLiffConfigured();
   const loginFlowInProgress = useRef(false);
 
+  /** LINE IDトークン → API → JWT → ログイン完了 */
+  const handleLineLoginFlow = useCallback(async () => {
+    // 既にフロー実行中なら二重実行を防止
+    if (loginFlowInProgress.current) return;
+    loginFlowInProgress.current = true;
+
+    setLineLoading(true);
+    setError(null);
+
+    try {
+      const idToken = getLiffIdToken();
+      if (!idToken) {
+        // IDトークン取得失敗 → LINE認証画面にリダイレクトして再取得
+        liffLogin();
+        return;
+      }
+
+      // API で LINE ユーザー認証 + JWT取得
+      const { token, userId } = await apiLineLogin(idToken);
+      setToken(token);
+
+      // ユーザー情報を取得してキャッシュ
+      const { user } = await apiGetMe();
+      setAuthUser({
+        id: userId,
+        displayName: user.display_name,
+        pictureUrl: user.picture_url,
+        targetBunrui: user.target_bunrui,
+        targetTotal: user.target_total_score,
+        examYear: user.exam_year,
+        loginMethod: "line",
+      });
+
+      // ログイン成功 → 自動ログイン試行フラグをクリア
+      sessionStorage.removeItem(AUTO_LOGIN_ATTEMPTED_KEY);
+
+      // 新規ユーザーはオンボーディングへ、既存ユーザーはホームへ
+      if (!user.target_bunrui) {
+        router.replace("/onboarding");
+      } else {
+        router.replace("/");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "LINEログインに失敗しました";
+      // IDトークン期限切れ・無効の場合は自動で再ログイン
+      if (
+        msg.includes("expired") ||
+        msg.includes("invalid") ||
+        msg.includes("token") ||
+        msg.includes("401") ||
+        msg.includes("IDトークン")
+      ) {
+        liffLogin();
+        return;
+      }
+      setError(msg);
+      setLineLoading(false);
+      loginFlowInProgress.current = false;
+    }
+  }, [router]);
+
   useEffect(() => {
     if (isLoggedIn()) {
       router.replace("/");
@@ -60,60 +121,7 @@ export default function LoginPage() {
           setLiffError(err instanceof Error ? err.message : "LIFF初期化エラー");
         });
     }
-  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /** LINE IDトークン → API → JWT → ログイン完了 */
-  const handleLineLoginFlow = useCallback(async () => {
-    // 既にフロー実行中なら二重実行を防止
-    if (loginFlowInProgress.current) return;
-    loginFlowInProgress.current = true;
-
-    setLineLoading(true);
-    setError(null);
-
-    try {
-      const idToken = getLiffIdToken();
-      if (!idToken) {
-        throw new Error("LINE IDトークンを取得できませんでした");
-      }
-
-      // API で LINE ユーザー認証 + JWT取得
-      const { token, userId } = await apiLineLogin(idToken);
-      setToken(token);
-
-      // ユーザー情報を取得してキャッシュ
-      const { user } = await apiGetMe();
-      setAuthUser({
-        id: userId,
-        displayName: user.display_name,
-        pictureUrl: user.picture_url,
-        targetBunrui: user.target_bunrui,
-        targetTotal: user.target_total_score,
-        examYear: user.exam_year,
-        loginMethod: "line",
-      });
-
-      // ログイン成功 → 自動ログイン試行フラグをクリア
-      sessionStorage.removeItem(AUTO_LOGIN_ATTEMPTED_KEY);
-
-      // 新規ユーザーはオンボーディングへ、既存ユーザーはホームへ
-      if (!user.target_bunrui) {
-        router.replace("/onboarding");
-      } else {
-        router.replace("/");
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "LINEログインに失敗しました";
-      // IDトークン期限切れの場合は自動で再ログイン
-      if (msg.includes("expired") || msg.includes("invalid")) {
-        liffLogin(); // logout→再login でフレッシュなトークンを取得
-        return;
-      }
-      setError(msg);
-      setLineLoading(false);
-      loginFlowInProgress.current = false;
-    }
-  }, [router]);
+  }, [router, liffConfigured, handleLineLoginFlow]);
 
   /** LINEログインボタン押下 */
   const handleLineLogin = useCallback(() => {

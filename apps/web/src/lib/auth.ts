@@ -51,10 +51,12 @@ export function logout(): void {
   // LIFF ログアウトフラグを立てて、ログインページでの自動再ログインを防止
   sessionStorage.setItem("kyoutsu_just_logged_out", "1");
   sessionStorage.removeItem("kyoutsu_auto_login_attempted");
-  // LIFF SDKのセッションもクリア
+  // LIFF SDKのセッションもクリア（動的importで安全にアクセス）
   try {
-    const liff = (window as unknown as { liff?: { isLoggedIn: () => boolean; logout: () => void } }).liff;
-    if (liff?.isLoggedIn?.()) liff.logout();
+    import("@line/liff").then((mod) => {
+      const liff = mod.default;
+      if (liff.isLoggedIn()) liff.logout();
+    }).catch(() => { /* LIFF未読込の場合は無視 */ });
   } catch { /* LIFF未読込の場合は無視 */ }
   window.location.href = "/login";
 }
