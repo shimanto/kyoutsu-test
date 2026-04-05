@@ -112,4 +112,39 @@ auth.post("/line-login", async (c) => {
   return c.json({ token, userId });
 });
 
+/** 管理者ログイン (パスワード認証) */
+auth.post("/admin-login", async (c) => {
+  const body = z.object({
+    password: z.string().min(1),
+  }).parse(await c.req.json());
+
+  // 管理者パスワードは JWT_SECRET の先頭16文字をハッシュ代わりに使用
+  const adminPass = c.env.JWT_SECRET.slice(0, 16);
+  if (body.password !== adminPass) {
+    return c.json({ error: "Invalid admin password" }, 401);
+  }
+
+  // 管理者ユーザーを取得 or 作成
+  let admin = await c.env.DB.prepare(
+    "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
+  ).first<{ id: string }>();
+
+  if (!admin) {
+    const adminId = generateId();
+    await c.env.DB.prepare(
+      `INSERT INTO users (id, line_user_id, display_name, role, exam_year)
+       VALUES (?, ?, ?, 'admin', ?)`
+    ).bind(adminId, `admin-${adminId}`, "管理者", new Date().getFullYear() + 1).run();
+    admin = { id: adminId };
+  }
+
+  const secret = new TextEncoder().encode(c.env.JWT_SECRET);
+  const token = await new SignJWT({ sub: admin.id, role: "admin" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("7d")
+    .sign(secret);
+
+  return c.json({ token, userId: admin.id });
+});
+
 export default auth;
