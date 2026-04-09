@@ -67,15 +67,22 @@ export function isInLiffClient(): boolean {
  * - LIFF環境内: 自動的にログイン済み
  */
 export function liffLogin(): void {
-  if (!initialized) {
-    window.location.href = `https://liff.line.me/${LIFF_ID}`;
+  if (!initialized || !LIFF_ID) {
+    // LIFF未初期化 or LIFF_ID未設定 → LIFF URLに直接遷移
+    if (LIFF_ID) {
+      window.location.href = `https://liff.line.me/${LIFF_ID}`;
+    }
     return;
   }
 
-  // 既にログイン済みでもIDトークンが期限切れの可能性がある
-  // 一度ログアウトしてから再ログインすることでフレッシュなトークンを取得
-  if (liff.isLoggedIn()) {
-    liff.logout();
+  try {
+    // 既にログイン済みでもIDトークンが期限切れの可能性がある
+    // 一度ログアウトしてからフレッシュなトークンを取得
+    if (liff.isLoggedIn()) {
+      liff.logout();
+    }
+  } catch {
+    // logout失敗は無視
   }
   liff.login({ redirectUri: window.location.origin + "/login" });
 }

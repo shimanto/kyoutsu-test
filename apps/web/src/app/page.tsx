@@ -101,9 +101,25 @@ export default function Home() {
       apiGetOverview().catch(() => null),
       apiGetDueCount().catch(() => ({ count: 0 })),
     ]).then(([ov, rc]) => {
-      if (ov && ov.fieldStats && ov.fieldStats.some((f: FieldStat) => f.total > 0)) {
-        setOverview(ov);
-        setUseApiData(true);
+      if (ov && ov.fieldStats && ov.fieldStats.length > 0) {
+        // APIデータがある場合: 回答データがある分野はAPIデータ、ない分野はクライアント補完
+        const clientData = generateOverviewFromDeviation(deviation);
+        const hasAnyAnswer = ov.fieldStats.some((f: FieldStat) => f.total > 0);
+
+        if (hasAnyAnswer) {
+          // APIデータを優先し、total=0の分野はクライアントデータで補完
+          const clientMap = new Map(clientData.fieldStats.map((f) => [f.field_id, f]));
+          const merged: FieldStat[] = ov.fieldStats.map((f: FieldStat) => {
+            if (f.total > 0) return f;
+            const fallback = clientMap.get(f.field_id);
+            return fallback ? { ...f, total: fallback.total, correct: fallback.correct } : f;
+          });
+          setOverview({ ...ov, fieldStats: merged });
+          setUseApiData(true);
+        } else {
+          // API分野構造はあるが回答なし → クライアントデータで全分野補完
+          setOverview(clientData);
+        }
       } else {
         setOverview(generateOverviewFromDeviation(deviation));
       }

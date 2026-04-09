@@ -9,7 +9,7 @@ import {
   type SampleQuestion,
 } from "@/lib/sample-data";
 import { getFieldQuestions } from "@/lib/question-generator";
-import { apiGenerateAiQuestion, apiGenerateVariantQuestion } from "@/lib/api";
+import { apiGenerateAiQuestion, apiGenerateVariantQuestion, apiStartSession, apiSubmitAnswer, apiFinishSession, apiRecordReview } from "@/lib/api";
 import { getRandomPraise, PRAISE_COUNT } from "@/lib/praise-messages";
 
 
@@ -272,11 +272,19 @@ function DrillSession({
   const [masteredChoices, setMasteredChoices] = useState<Map<string, Set<string>>>(new Map());
   // 全選択肢制覇した問題数
   const [fullyMasteredCount, setFullyMasteredCount] = useState(0);
-  // 全問正解リトライによる正答率ボーナス
   const [rateBonus, setRateBonus] = useState(0);
+  // API セッション管理
+  const [apiSessionId, setApiSessionId] = useState<string | null>(null);
 
   const question = activeQuestions[currentIndex];
   const totalQuestions = activeQuestions.length;
+
+  // ドリル開始時にAPIセッションを作成
+  useEffect(() => {
+    apiStartSession({ sessionType: "drill", fieldId, questionCount: totalQuestions })
+      .then((res) => setApiSessionId(res.sessionId))
+      .catch(() => {}); // API失敗してもローカルで続行
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // タイマー
   useEffect(() => {
@@ -300,6 +308,17 @@ function DrillSession({
       total: prev.total + 1,
     }));
     setQuestionResults((prev) => new Map(prev).set(question.id, correct));
+
+    // API に回答を送信（非同期・失敗してもローカルは続行）
+    if (apiSessionId && question.id && !question.id.startsWith("ai_") && !question.id.includes("_v")) {
+      apiSubmitAnswer(apiSessionId, {
+        questionId: question.id,
+        chosenChoiceId: selectedChoiceId,
+        timeSpentMs: elapsedMs,
+      }).catch(() => {});
+      // 忘却曲線にも記録 (正解=5, 不正解=1)
+      apiRecordReview({ questionId: question.id, quality: correct ? 5 : 1 }).catch(() => {});
+    }
 
     // 正解した場合、その選択肢(=正解選択肢)をmastered追跡に記録
     if (correct) {
@@ -332,6 +351,10 @@ function DrillSession({
       setPhase("question");
     } else {
       setPhase("complete");
+      // APIセッションを完了
+      if (apiSessionId) {
+        apiFinishSession(apiSessionId).catch(() => {});
+      }
     }
   };
 
