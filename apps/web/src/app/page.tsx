@@ -257,7 +257,7 @@ export default function Home() {
           );
         })()}
 
-        {/* ════ S&P500 ヒートマップ ════ */}
+        {/* ════ 配点ヒートマップ ════ */}
         <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold">学習マップ</h2>

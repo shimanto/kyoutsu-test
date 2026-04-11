@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     template: `%s | ${BRAND.NAME}`,
   },
   description:
-    `${TAGLINE.PRIMARY} — 忘却曲線(SM-2)×弱点自動検出×S&P500スタイル学習マップで共通テスト全9科目900点を可視化。東大・難関大合格に向けた最短ルートを自動生成。`,
+    `${TAGLINE.PRIMARY} — 忘却曲線(SM-2)×弱点自動検出×配点ヒートマップで共通テスト全9科目900点を可視化。東大・難関大合格に向けた最短ルートを自動生成。`,
   keywords: [
     "共通テスト", "共通テスト対策", "大学受験", "東大", "東京大学",
     "学習プラットフォーム", "忘却曲線", "SM-2", "弱点検出", "学習マップ",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
         url: `https://${BRAND.DOMAIN}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: `${BRAND.NAME} — S&P500スタイル学習マップで共通テスト攻略`,
+        alt: `${BRAND.NAME} — 配点ヒートマップで共通テスト攻略`,
       },
     ],
   },

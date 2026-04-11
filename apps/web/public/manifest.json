@@ -1,7 +1,7 @@
 {
   "name": "大学物語 — 共通テスト攻略プラットフォーム",
   "short_name": "大学物語",
-  "description": "忘却曲線(SM-2)×弱点自動検出×S&P500スタイル学習マップで共通テスト全9科目を可視化。志望大学合格への最短ルートを自動生成。",
+  "description": "忘却曲線(SM-2)×弱点自動検出×配点ヒートマップで共通テスト全9科目を可視化。志望大学合格への最短ルートを自動生成。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#030712",
@@ -22,7 +22,7 @@
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "学習マップ — S&P500スタイルのヒートマップで全科目を俯瞰"
+      "label": "学習マップ — 配点ヒートマップで全科目を俯瞰"
     },
     {
       "src": "/screenshots/heatmap-desktop.png",

@@ -10,7 +10,7 @@ export function JsonLd() {
     alternateName: "Daigaku Monogatari",
     url: "https://daigaku-monogatari.pages.dev",
     description:
-      "弱点が見える。だから伸びる。— 共通テストに特化した学習プラットフォーム。忘却曲線(SM-2)×弱点自動検出×S&P500スタイル学習マップで効率的に志望大学合格を目指す。",
+      "弱点が見える。だから伸びる。— 共通テストに特化した学習プラットフォーム。忘却曲線(SM-2)×弱点自動検出×配点ヒートマップで効率的に志望大学合格を目指す。",
     slogan: "弱点が見える。だから伸びる。",
     applicationCategory: "EducationalApplication",
     operatingSystem: "Web",

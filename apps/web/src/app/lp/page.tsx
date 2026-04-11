@@ -11,7 +11,7 @@ import { SnsFollowCta, SnsLinks } from "@/components/brand/SnsLinks";
 const FEATURES = [
   {
     icon: "▣",
-    title: "S&P500スタイル学習マップ",
+    title: "配点ヒートマップ",
     desc: "全9科目900点を配点比例のブロックで可視化。正答率に応じて赤→緑にリアルタイム変化。弱点が一目でわかる。",
     color: "#22c55e",
   },

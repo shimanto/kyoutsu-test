@@ -118,7 +118,7 @@ export default function BrandGuidePage() {
             <p className="text-sm text-gray-300 leading-relaxed">
               <strong>3x3ヒートマップグリッド</strong>をロゴマークとし、
               「弱点(赤) → 成長(黄) → 習得(緑)」の学習プログレスを視覚化。
-              S&P500スタイルヒートマップという本サービスの核心機能をそのままブランドシンボルにしている。
+              配点ヒートマップという本サービスの核心機能をそのままブランドシンボルにしている。
             </p>
           </div>
 
