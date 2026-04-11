@@ -321,19 +321,31 @@ export default function Home() {
               const gRate = gTotal > 0 ? gCorrect / gTotal : 0;
               const estScore = Math.round(gRate * group.maxScore);
 
+              // 弱点分野を特定
+              const weakest = [...gFields].sort((a, b) => {
+                const rA = a.total > 0 ? a.correct / a.total : 1;
+                const rB = b.total > 0 ? b.correct / b.total : 1;
+                return rA - rB;
+              })[0];
+
               return (
                 <div key={group.id} className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-                  {/* グループヘッダー */}
-                  <div className="px-2.5 py-1.5 border-b border-gray-800/50 flex justify-between items-center">
+                  {/* グループヘッダー (クリックで教科詳細へ) */}
+                  <button
+                    onClick={() => router.push(`/subject/${group.id}`)}
+                    className="w-full px-2.5 py-1.5 border-b border-gray-800/50 flex justify-between items-center
+                               hover:bg-gray-800/50 transition-colors cursor-pointer"
+                  >
                     <div className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
                       <span className="font-bold text-sm">{group.label}</span>
+                      <span className="text-[9px] text-gray-600">▶</span>
                     </div>
                     <span className="text-xs">
                       <span className="font-mono font-bold" style={{ color: rateToColor(gRate, gTotal) }}>{estScore}</span>
                       <span className="text-gray-600">/{group.maxScore}</span>
                     </span>
-                  </div>
+                  </button>
 
                   {/* 分野ブロック (配点比例 treemap) */}
                   <div className="p-1.5 flex flex-wrap gap-1">
@@ -381,6 +393,16 @@ export default function Home() {
                       );
                     })}
                   </div>
+
+                  {/* 教科詳細リンク */}
+                  <button
+                    onClick={() => router.push(`/subject/${group.id}`)}
+                    className="w-full py-1.5 text-[10px] border-t border-gray-800/50 transition-colors
+                               hover:bg-gray-800/30 flex items-center justify-center gap-1"
+                    style={{ color: group.color }}
+                  >
+                    {group.label}の詳細ヒートマップ →
+                  </button>
                 </div>
               );
             })}
