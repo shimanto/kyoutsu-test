@@ -200,6 +200,7 @@ export default function DashboardPage() {
       <SubjectHeatmap
         fieldStats={fieldStats}
         onFieldClick={handleFieldClick}
+        onGroupClick={(groupId) => router.push(`/subject/${groupId}`)}
       />
 
       {/* 凡例 */}

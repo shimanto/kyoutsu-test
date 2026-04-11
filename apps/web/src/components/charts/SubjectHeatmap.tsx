@@ -14,6 +14,7 @@ interface FieldStat {
 interface SubjectHeatmapProps {
   fieldStats: FieldStat[];
   onFieldClick?: (fieldId: string, subjectId: string) => void;
+  onGroupClick?: (groupId: string) => void;
 }
 
 /** 正答率 → 色 (赤→黄→緑グラデーション) */
@@ -54,7 +55,7 @@ const SUBJECT_GROUPS = [
   { id: "info", label: "情報", subjectIds: ["info1"], maxScore: 100 },
 ];
 
-export function SubjectHeatmap({ fieldStats, onFieldClick }: SubjectHeatmapProps) {
+export function SubjectHeatmap({ fieldStats, onFieldClick, onGroupClick }: SubjectHeatmapProps) {
   return (
     <div className="grid grid-cols-3 grid-rows-2 gap-2 md:gap-3">
       {SUBJECT_GROUPS.map((group) => {
@@ -74,9 +75,15 @@ export function SubjectHeatmap({ fieldStats, onFieldClick }: SubjectHeatmapProps
             key={group.id}
             className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden"
           >
-            {/* グループヘッダー */}
-            <div className="px-3 py-1.5 border-b border-gray-800 flex justify-between items-center">
-              <span className="font-bold text-sm">{group.label}</span>
+            {/* グループヘッダー (クリックでドリルダウン) */}
+            <button
+              onClick={() => onGroupClick?.(group.id)}
+              className="w-full px-3 py-1.5 border-b border-gray-800 flex justify-between items-center
+                         hover:bg-gray-800/50 transition-colors cursor-pointer text-left"
+            >
+              <span className="font-bold text-sm">{group.label}
+                <span className="text-[10px] text-gray-500 ml-1">&#9654;</span>
+              </span>
               <span className="text-xs text-gray-400">
                 <span
                   className="font-mono font-bold text-sm"
@@ -86,7 +93,7 @@ export function SubjectHeatmap({ fieldStats, onFieldClick }: SubjectHeatmapProps
                 </span>
                 <span className="text-gray-600"> / {group.maxScore}</span>
               </span>
-            </div>
+            </button>
 
             {/* 分野ブロック (treemap-like) */}
             <div className="p-1.5 flex flex-wrap gap-1">

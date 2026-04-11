@@ -102,6 +102,91 @@ analytics.get("/subject/:subjectId", async (c) => {
   return c.json({ fieldStats: fieldStats.results, difficultyStats: difficultyStats.results });
 });
 
+/** 分野別 単元統計 (ドリルダウン用) */
+analytics.get("/field/:fieldId", async (c) => {
+  const userId = c.get("userId");
+  const fieldId = c.req.param("fieldId");
+
+  // 分野情報
+  const field = await c.env.DB.prepare(
+    "SELECT f.id, f.name, f.subject_id, s.name as subject_name FROM fields f JOIN subjects s ON f.subject_id = s.id WHERE f.id = ?"
+  ).bind(fieldId).first<{ id: string; name: string; subject_id: string; subject_name: string }>();
+
+  if (!field) return c.json({ error: "Field not found" }, 404);
+
+  // 単元一覧
+  const units = await c.env.DB.prepare(
+    "SELECT id, name, display_order FROM units WHERE field_id = ? ORDER BY display_order"
+  ).bind(fieldId).all<{ id: string; name: string; display_order: number }>();
+
+  // 単元別正答率
+  const unitStats = await c.env.DB.prepare(`
+    SELECT u.id as unit_id,
+           COUNT(a.id) as total,
+           SUM(a.is_correct) as correct,
+           AVG(a.time_spent_ms) as avg_time_ms,
+           AVG(q.difficulty) as avg_difficulty
+    FROM units u
+    LEFT JOIN questions q ON q.unit_id = u.id
+    LEFT JOIN answers a ON a.question_id = q.id AND a.user_id = ?
+    WHERE u.field_id = ?
+    GROUP BY u.id
+  `).bind(userId, fieldId).all<{
+    unit_id: string; total: number; correct: number;
+    avg_time_ms: number | null; avg_difficulty: number | null;
+  }>();
+
+  const statMap = new Map(unitStats.results.map((s) => [s.unit_id, s]));
+
+  // 単元別の問題数
+  const questionCounts = await c.env.DB.prepare(`
+    SELECT u.id as unit_id, COUNT(q.id) as question_count
+    FROM units u LEFT JOIN questions q ON q.unit_id = u.id
+    WHERE u.field_id = ?
+    GROUP BY u.id
+  `).bind(fieldId).all<{ unit_id: string; question_count: number }>();
+
+  const qCountMap = new Map(questionCounts.results.map((q) => [q.unit_id, q.question_count]));
+
+  // 復習待ち件数
+  const reviewCounts = await c.env.DB.prepare(`
+    SELECT u.id as unit_id, COUNT(rs.id) as review_due
+    FROM units u
+    JOIN questions q ON q.unit_id = u.id
+    JOIN review_schedules rs ON rs.question_id = q.id AND rs.user_id = ?
+    WHERE u.field_id = ? AND rs.next_review_date <= date('now')
+    GROUP BY u.id
+  `).bind(userId, fieldId).all<{ unit_id: string; review_due: number }>();
+
+  const reviewMap = new Map(reviewCounts.results.map((r) => [r.unit_id, r.review_due]));
+
+  const unitDetails = units.results.map((u) => {
+    const s = statMap.get(u.id);
+    return {
+      unit_id: u.id,
+      unit_name: u.name,
+      display_order: u.display_order,
+      total: s?.total || 0,
+      correct: s?.correct || 0,
+      avg_time_ms: s?.avg_time_ms || null,
+      avg_difficulty: s?.avg_difficulty || null,
+      question_count: qCountMap.get(u.id) || 0,
+      review_due: reviewMap.get(u.id) || 0,
+    };
+  });
+
+  return c.json({
+    field: {
+      id: field.id,
+      name: field.name,
+      subject_id: field.subject_id,
+      subject_name: field.subject_name,
+      points: FIELD_POINTS[field.id] || 15,
+    },
+    unitStats: unitDetails,
+  });
+});
+
 /** 時系列推移 */
 analytics.get("/history", async (c) => {
   const userId = c.get("userId");

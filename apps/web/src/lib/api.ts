@@ -152,6 +152,21 @@ export async function apiGetHistory() {
   }>("/analytics/history");
 }
 
+// ─── Analytics: Field drill-down ───
+export async function apiGetFieldDetail(fieldId: string) {
+  return apiFetch<{
+    field: {
+      id: string; name: string; subject_id: string; subject_name: string; points: number;
+    };
+    unitStats: {
+      unit_id: string; unit_name: string; display_order: number;
+      total: number; correct: number;
+      avg_time_ms: number | null; avg_difficulty: number | null;
+      question_count: number; review_due: number;
+    }[];
+  }>(`/analytics/field/${fieldId}`);
+}
+
 // ─── Setup (テストデータ生成) ───
 export async function apiGenerateTestData(data: {
   deviation: number;
